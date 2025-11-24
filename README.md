@@ -10,16 +10,28 @@ go get github.com/donnigundala/dg-cache@v1.1.0
 
 ## Features
 
-- **Unified API**: Consistent interface across all drivers
-- **Serialization**: Automatic marshaling/unmarshaling of complex types (structs, slices, maps)
-- **Multiple Serializers**: JSON (default) and Msgpack (2.6x faster unmarshal)
-- **Memory Driver**: Production-ready with LRU eviction, size limits, and metrics
-- **Multiple Stores**: Support for multiple cache stores in a single application
-- **Typed Helpers**: Type-safe retrieval methods (`GetAs`, `GetString`, `GetInt`, etc.)
-- **Fluent Interface**: Easy-to-use API inspired by modern frameworks
-- **Remember Pattern**: Built-in cache-aside implementation
-- **Tagging**: Group related cache items (driver dependent)
-- **Atomic Operations**: Increment/Decrement support
+- 🚀 **Unified API** - Simple, consistent interface across all drivers
+- 🔄 **Multiple Stores** - Use different drivers for different purposes
+- 💾 **Built-in Drivers** - Memory (testing) and Redis (production) included
+- 🔧 **Extensible** - Easy to add custom drivers
+- 📦 **Serialization** - Automatic marshaling/unmarshaling with JSON or Msgpack
+- 🏷️ **Tagged Cache** - Group related items with tags (Redis driver)
+- ⚡ **Performance** - LRU eviction, metrics, and optimized serialization
+
+## Included Drivers
+
+### Memory Driver (`drivers/memory`)
+- In-memory caching for development/testing
+- LRU eviction with configurable size limits
+- Metrics tracking (hits, misses, evictions)
+- Thread-safe operations
+
+### Redis Driver (`drivers/redis`)
+- Production-ready Redis caching
+- JSON and Msgpack serialization
+- Tagged cache support
+- Shared client support
+- Connection pooling
 
 ## Quick Start
 
@@ -108,23 +120,23 @@ manager, _ := cache.NewManager(cache.Config{
 ### Redis with Msgpack Serialization
 
 ```go
-import "github.com/donnigundala/dg-redis"
+import (
+    "github.com/donnigundala/dg-cache"
+    "github.com/donnigundala/dg-cache/drivers/redis"
+)
 
-manager, _ := cache.NewManager(cache.Config{
-    DefaultStore: "redis",
-    Stores: map[string]cache.StoreConfig{
-        "redis": {
-            Driver: "redis",
-            Options: map[string]interface{}{
-                "host":       "localhost",
-                "port":       6379,
-                "serializer": "msgpack",  // 2.6x faster than JSON!
-            },
-        },
+// Option 1: Create driver with config
+redisDriver, _ := redis.NewDriver(cache.StoreConfig{
+    Options: map[string]interface{}{
+        "host":       "localhost",
+        "port":       6379,
+        "serializer": "msgpack", // or "json"
     },
 })
 
-manager.RegisterDriver("redis", redis.NewDriver)
+// Option 2: Use shared Redis client
+client := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+redisDriver := redis.NewDriverWithClient(client, "app")
 ```
 
 ### Remember Pattern
