@@ -9,26 +9,61 @@ import (
 )
 
 // Driver is an in-memory cache driver.
-// It stores cache items in memory with TTL support.
-// This driver is primarily intended for testing and development.
+// It stores cache items in memory with TTL support, size limits, and LRU eviction.
 type Driver struct {
 	items  map[string]*cache.Item
+	lru    *lruList
+	nodes  map[string]*lruNode // key -> LRU node mapping
 	mu     sync.RWMutex
 	prefix string
 	ticker *time.Ticker
 	done   chan bool
+
+	config  Config
+	metrics *Metrics
 }
 
 // NewDriver creates a new in-memory cache driver.
-func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
+func NewDriver(storeConfig cache.StoreConfig) (cache.Driver, error) {
+	config := DefaultConfig()
+
+	// Parse options from storeConfig
+	if val, ok := storeConfig.Options["max_items"].(int); ok {
+		config.MaxItems = val
+	}
+	// Handle both int and int64 for max_bytes
+	if val, ok := storeConfig.Options["max_bytes"].(int64); ok {
+		config.MaxBytes = val
+	} else if val, ok := storeConfig.Options["max_bytes"].(int); ok {
+		config.MaxBytes = int64(val)
+	}
+	if val, ok := storeConfig.Options["eviction_policy"].(string); ok {
+		config.EvictionPolicy = val
+	}
+	if val, ok := storeConfig.Options["cleanup_interval"]; ok {
+		if duration, ok := val.(time.Duration); ok {
+			config.CleanupInterval = duration
+		}
+	}
+	if val, ok := storeConfig.Options["enable_metrics"].(bool); ok {
+		config.EnableMetrics = val
+	}
+
 	d := &Driver{
 		items:  make(map[string]*cache.Item),
+		lru:    newLRUList(),
+		nodes:  make(map[string]*lruNode),
 		prefix: "",
 		done:   make(chan bool),
+		config: config,
+	}
+
+	if config.EnableMetrics {
+		d.metrics = newMetrics()
 	}
 
 	// Start cleanup goroutine
-	d.ticker = time.NewTicker(1 * time.Minute)
+	d.ticker = time.NewTicker(config.CleanupInterval)
 	go d.cleanup()
 
 	return d, nil
@@ -67,18 +102,108 @@ func (d *Driver) prefixKey(key string) string {
 	return d.prefix + ":" + key
 }
 
+// estimateSize estimates the size of a value in bytes.
+func (d *Driver) estimateSize(value interface{}) int64 {
+	switch v := value.(type) {
+	case string:
+		return int64(len(v))
+	case []byte:
+		return int64(len(v))
+	case int, int8, int16, int32, int64:
+		return 8
+	case uint, uint8, uint16, uint32, uint64:
+		return 8
+	case float32, float64:
+		return 8
+	case bool:
+		return 1
+	default:
+		// Default estimate for complex types
+		return 64
+	}
+}
+
+// evictIfNeeded evicts items if size limits would be exceeded by adding newItemSize bytes.
+func (d *Driver) evictIfNeeded(newItemSize int64) {
+	// Check item count limit
+	if d.config.MaxItems > 0 && len(d.items) >= d.config.MaxItems {
+		d.evictOne()
+	}
+
+	// Check bytes limit - evict until we have room for the new item
+	if d.config.MaxBytes > 0 {
+		// Calculate current size
+		currentBytes := int64(0)
+		if d.metrics != nil {
+			currentBytes = d.metrics.bytesUsed
+		} else {
+			// Calculate on the fly if metrics disabled
+			for _, item := range d.items {
+				currentBytes += d.estimateSize(item.Value)
+			}
+		}
+
+		for currentBytes+newItemSize > d.config.MaxBytes {
+			if !d.evictOne() {
+				break // No more items to evict
+			}
+			// Recalculate current size after eviction
+			if d.metrics != nil {
+				currentBytes = d.metrics.bytesUsed
+			} else {
+				currentBytes = 0
+				for _, item := range d.items {
+					currentBytes += d.estimateSize(item.Value)
+				}
+			}
+		}
+	}
+}
+
+// evictOne evicts a single item based on the eviction policy.
+// Returns true if an item was evicted, false if cache is empty.
+func (d *Driver) evictOne() bool {
+	if d.config.EvictionPolicy == "lru" {
+		key := d.lru.removeLast()
+		if key == "" {
+			return false
+		}
+
+		if item, ok := d.items[key]; ok {
+			size := d.estimateSize(item.Value)
+			if d.metrics != nil {
+				d.metrics.RecordEviction(size)
+			}
+			delete(d.items, key)
+			delete(d.nodes, key)
+			return true
+		}
+	}
+	return false
+}
+
 // Get retrieves a value from the cache.
 func (d *Driver) Get(ctx context.Context, key string) (interface{}, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	item, ok := d.items[d.prefixKey(key)]
-	if !ok {
+	prefixedKey := d.prefixKey(key)
+	item, ok := d.items[prefixedKey]
+
+	if !ok || item.IsExpired() {
+		if d.metrics != nil {
+			d.metrics.RecordMiss()
+		}
 		return nil, cache.ErrKeyNotFound
 	}
 
-	if item.IsExpired() {
-		return nil, cache.ErrKeyNotFound
+	// Update LRU
+	if node, ok := d.nodes[prefixedKey]; ok {
+		d.lru.moveToFront(node)
+	}
+
+	if d.metrics != nil {
+		d.metrics.RecordHit()
 	}
 
 	return item.Value, nil
@@ -105,6 +230,21 @@ func (d *Driver) Put(ctx context.Context, key string, value interface{}, ttl tim
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	prefixedKey := d.prefixKey(key)
+	newSize := d.estimateSize(value)
+
+	// Calculate net size change (for replacements)
+	netSizeChange := newSize
+	if oldItem, ok := d.items[prefixedKey]; ok {
+		oldSize := d.estimateSize(oldItem.Value)
+		netSizeChange = newSize - oldSize
+	}
+
+	// Check if we need to evict (pass the net size change)
+	if netSizeChange > 0 {
+		d.evictIfNeeded(netSizeChange)
+	}
+
 	item := &cache.Item{
 		Key:   key,
 		Value: value,
@@ -114,7 +254,26 @@ func (d *Driver) Put(ctx context.Context, key string, value interface{}, ttl tim
 		item.ExpiresAt = time.Now().Add(ttl)
 	}
 
-	d.items[d.prefixKey(key)] = item
+	// Update metrics
+	if d.metrics != nil {
+		if oldItem, ok := d.items[prefixedKey]; ok {
+			// Replacing existing item
+			oldSize := d.estimateSize(oldItem.Value)
+			d.metrics.RecordUpdate(oldSize, newSize)
+		} else {
+			d.metrics.RecordSet(newSize)
+		}
+	}
+
+	d.items[prefixedKey] = item
+
+	// Update LRU
+	if node, ok := d.nodes[prefixedKey]; ok {
+		d.lru.moveToFront(node)
+	} else {
+		d.nodes[prefixedKey] = d.lru.addToFront(prefixedKey)
+	}
+
 	return nil
 }
 
@@ -224,6 +383,14 @@ func (d *Driver) SetPrefix(prefix string) {
 // Name returns the driver name.
 func (d *Driver) Name() string {
 	return "memory"
+}
+
+// Stats returns cache statistics (if metrics enabled).
+func (d *Driver) Stats() Stats {
+	if d.metrics == nil {
+		return Stats{}
+	}
+	return d.metrics.Stats()
 }
 
 // Close closes the driver and releases resources.
