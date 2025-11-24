@@ -40,15 +40,21 @@ func (s *JSONSerializer) Marshal(v interface{}) ([]byte, error) {
 
 // Unmarshal converts JSON bytes back to a Go value.
 func (s *JSONSerializer) Unmarshal(data []byte, v interface{}) error {
-	// Try to unmarshal directly first (for simple types and backward compatibility)
-	if err := json.Unmarshal(data, v); err == nil {
-		return nil
+	// 1. Try to unmarshal as an Envelope first
+	// We use a temporary struct with RawMessage to defer unmarshaling of the value
+	type tempEnvelope struct {
+		Type  string          `json:"type"`
+		Value json.RawMessage `json:"value"`
 	}
 
-	// If that fails, try to unmarshal as an envelope
-	var envelope Envelope
-	envelope.Value = v
-	return json.Unmarshal(data, &envelope)
+	var temp tempEnvelope
+	if err := json.Unmarshal(data, &temp); err == nil && temp.Type != "" {
+		// It's a valid envelope, unmarshal the inner value into v
+		return json.Unmarshal(temp.Value, v)
+	}
+
+	// 2. Fallback: Unmarshal directly (for simple types or backward compatibility)
+	return json.Unmarshal(data, v)
 }
 
 // Name returns the serializer name.
