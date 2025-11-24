@@ -1,67 +1,130 @@
-# dgcore-cache
+# dg-cache
 
-Abstract caching layer for the dgcore framework. Provides a unified API for various cache drivers with support for tagging, atomic operations, and the "Remember" pattern.
+Abstract caching layer for the dg-framework. Provides a unified API for various cache drivers with support for serialization, tagging, atomic operations, and the "Remember" pattern.
 
 ## Installation
 
 ```bash
-go get github.com/donnigundala/dg-cache
+go get github.com/donnigundala/dg-cache@v1.1.0
 ```
 
 ## Features
 
 - **Unified API**: Consistent interface across all drivers
+- **Serialization**: Automatic marshaling/unmarshaling of complex types (structs, slices, maps)
+- **Multiple Serializers**: JSON (default) and Msgpack (2.6x faster unmarshal)
+- **Memory Driver**: Production-ready with LRU eviction, size limits, and metrics
 - **Multiple Stores**: Support for multiple cache stores in a single application
+- **Typed Helpers**: Type-safe retrieval methods (`GetAs`, `GetString`, `GetInt`, etc.)
 - **Fluent Interface**: Easy-to-use API inspired by modern frameworks
 - **Remember Pattern**: Built-in cache-aside implementation
 - **Tagging**: Group related cache items (driver dependent)
 - **Atomic Operations**: Increment/Decrement support
-- **In-Memory Driver**: Built-in driver for testing and local development
 
-## Usage
+## Quick Start
 
-### Initialization
+### Basic Usage
 
 ```go
 import (
-    "github.com/donnigundala/dgcore-cache"
-    "github.com/donnigundala/dgcore-cache/drivers/memory"
+    "context"
+    "time"
+    "github.com/donnigundala/dg-cache"
+    "github.com/donnigundala/dg-cache/drivers/memory"
 )
 
 func main() {
-    // Configure
-    cfg := cache.DefaultConfig()
-    
     // Create manager
-    manager, err := cache.NewManager(cfg)
-    if err != nil {
-        panic(err)
-    }
-
-    // Register drivers
+    manager, _ := cache.NewManager(cache.DefaultConfig())
+    
+    // Register memory driver
     manager.RegisterDriver("memory", memory.NewDriver)
+    
+    ctx := context.Background()
+    
+    // Store and retrieve strings
+    manager.Put(ctx, "name", "John", 10*time.Minute)
+    val, _ := manager.Get(ctx, "name")
+    name := val.(string) // "John"
 }
 ```
 
-### Basic Operations
+### Caching Complex Types
 
 ```go
-ctx := context.Background()
+type User struct {
+    ID    int
+    Name  string
+    Email string
+}
 
-// Store a value
-err := manager.Put(ctx, "user:1", user, 10*time.Minute)
+// Store any Go type - automatic serialization!
+user := User{ID: 1, Name: "John", Email: "john@example.com"}
+manager.Put(ctx, "user:1", user, 1*time.Hour)
 
-// Retrieve a value
-val, err := manager.Get(ctx, "user:1")
+// Retrieve with type assertion
+val, _ := manager.Get(ctx, "user:1")
+user = val.(User)
 
-// Check existence
-exists, err := manager.Has(ctx, "user:1")
+// Or use type-safe helper
+var user User
+manager.GetAs(ctx, "user:1", &user)
+```
 
-// Remove a value
-err := manager.Forget(ctx, "user:1")
+### Typed Helpers
 
-// Retrieve and delete
-val, err := manager.Pull(ctx, "temp_key")
+```go
+// Type-safe retrieval methods
+name, err := manager.GetString(ctx, "name")
+age, err := manager.GetInt(ctx, "age")
+score, err := manager.GetFloat64(ctx, "score")
+active, err := manager.GetBool(ctx, "active")
+
+// Generic type-safe method
+var config map[string]interface{}
+err := manager.GetAs(ctx, "config", &config)
+```
+
+### Memory Driver with Limits
+
+```go
+manager, _ := cache.NewManager(cache.Config{
+    DefaultStore: "memory",
+    Stores: map[string]cache.StoreConfig{
+        "memory": {
+            Driver: "memory",
+            Options: map[string]interface{}{
+                "max_items":        1000,              // Max 1000 items
+                "max_bytes":        10 * 1024 * 1024,  // Max 10MB
+                "eviction_policy":  "lru",             // LRU eviction
+                "cleanup_interval": 1 * time.Minute,   // Cleanup every minute
+                "enable_metrics":   true,              // Enable statistics
+            },
+        },
+    },
+})
+```
+
+### Redis with Msgpack Serialization
+
+```go
+import "github.com/donnigundala/dg-redis"
+
+manager, _ := cache.NewManager(cache.Config{
+    DefaultStore: "redis",
+    Stores: map[string]cache.StoreConfig{
+        "redis": {
+            Driver: "redis",
+            Options: map[string]interface{}{
+                "host":       "localhost",
+                "port":       6379,
+                "serializer": "msgpack",  // 2.6x faster than JSON!
+            },
+        },
+    },
+})
+
+manager.RegisterDriver("redis", redis.NewDriver)
 ```
 
 ### Remember Pattern
@@ -95,9 +158,104 @@ redisStore.Put(ctx, "key", "value", 0)
 manager.Put(ctx, "key", "value", 0)
 ```
 
+## Serialization
+
+### Supported Types
+
+- Primitives: `string`, `int`, `float64`, `bool`
+- Complex types: `struct`, `slice`, `map`
+- Nested structures
+- Custom types
+
+### Choosing a Serializer
+
+**JSON** (default):
+- Human-readable
+- ~150ns marshal, ~440ns unmarshal
+- Good for debugging
+
+**Msgpack**:
+- Binary format (30-50% smaller)
+- ~210ns marshal, ~172ns unmarshal (2.6x faster!)
+- Better for production
+
+```go
+Options: map[string]interface{}{
+    "serializer": "msgpack",  // or "json"
+}
+```
+
+## Memory Driver Features
+
+### Size Limits
+
+```go
+Options: map[string]interface{}{
+    "max_items": 1000,              // Maximum number of items
+    "max_bytes": 10 * 1024 * 1024,  // Maximum total size (10MB)
+}
+```
+
+### LRU Eviction
+
+Automatically evicts least recently used items when limits are reached:
+
+```go
+Options: map[string]interface{}{
+    "eviction_policy": "lru",  // Least Recently Used
+}
+```
+
+### Metrics
+
+```go
+Options: map[string]interface{}{
+    "enable_metrics": true,
+}
+
+// Get statistics
+driver := manager.Store("memory").(*memory.Driver)
+stats := driver.Stats()
+fmt.Printf("Hit rate: %.2f%%\n", stats.HitRate*100)
+fmt.Printf("Items: %d, Bytes: %d\n", stats.ItemCount, stats.BytesUsed)
+```
+
 ## Creating Custom Drivers
 
-Implement the `cache.Driver` interface to create a custom driver.
+Implement the `cache.Driver` interface:
+
+```go
+type Driver interface {
+    Get(ctx context.Context, key string) (interface{}, error)
+    Put(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+    Forget(ctx context.Context, key string) error
+    Flush(ctx context.Context) error
+    // ... other methods
+}
+```
+
+## Performance
+
+### Benchmarks
+
+```
+BenchmarkJSON_Marshal        7,542,747    152.6 ns/op    128 B/op    2 allocs/op
+BenchmarkMsgpack_Marshal     5,384,852    210.9 ns/op    272 B/op    4 allocs/op
+BenchmarkJSON_Unmarshal      2,329,303    443.5 ns/op    216 B/op    4 allocs/op
+BenchmarkMsgpack_Unmarshal   6,601,837    172.1 ns/op     96 B/op    2 allocs/op
+```
+
+**Msgpack is 2.6x faster for unmarshal operations!**
+
+## License
+
+MIT License
+
+## Related Packages
+
+- [dg-redis](https://github.com/donnigundala/dg-redis) - Redis driver for dg-cache
+- [dg-core](https://github.com/donnigundala/dg-core) - Core framework
+
 
 ```go
 type MyDriver struct {
