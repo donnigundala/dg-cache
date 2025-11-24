@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-24
+
+### Added
+- **Redis driver now included** - Merged dg-redis into `drivers/redis`
+- Redis driver with full feature parity (tagged cache, serialization)
+- `NewDriverWithClient()` for shared Redis connections
+- Comprehensive Redis driver documentation
+
+### Changed
+- Redis driver import path: `github.com/donnigundala/dg-cache/drivers/redis`
+- Package structure now mirrors memory driver pattern
+
+### Deprecated
+- `github.com/donnigundala/dg-redis` package (use `drivers/redis` instead)
+
+### Migration
+**Old:**
+```go
+import "github.com/donnigundala/dg-redis"
+```
+
+**New:**
+```go
+import "github.com/donnigundala/dg-cache/drivers/redis"
+```
+
+## [1.2.1] - 2025-11-24
+
+### Fixed
+- JSON serializer now correctly handles Envelope-wrapped values
+- Improved Envelope detection using json.RawMessage
+
 ## [1.2.0] - 2025-11-24
 
 ### Added
