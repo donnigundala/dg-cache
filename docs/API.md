@@ -515,7 +515,7 @@ Redis-based cache driver with serialization support.
 
 **Example:**
 ```go
-import "github.com/donnigundala/dg-redis"
+import "github.com/donnigundala/dg-cache/drivers/redis"
 
 manager.RegisterDriver("redis", redis.NewDriver)
 ```

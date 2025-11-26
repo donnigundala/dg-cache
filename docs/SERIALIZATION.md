@@ -231,7 +231,7 @@ config := cache.Config{
 ```go
 import (
     "github.com/donnigundala/dg-cache"
-    "github.com/donnigundala/dg-redis"
+    "github.com/donnigundala/dg-cache/drivers/redis"
 )
 
 // JSON serializer (default)

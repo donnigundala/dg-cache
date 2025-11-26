@@ -5,7 +5,7 @@ Abstract caching layer for the dg-framework. Provides a unified API for various 
 ## Installation
 
 ```bash
-go get github.com/donnigundala/dg-cache@v1.1.0
+go get github.com/donnigundala/dg-cache@v1.3.0
 ```
 
 ## Features
@@ -17,6 +17,55 @@ go get github.com/donnigundala/dg-cache@v1.1.0
 - 📦 **Serialization** - Automatic marshaling/unmarshaling with JSON or Msgpack
 - 🏷️ **Tagged Cache** - Group related items with tags (Redis driver)
 - ⚡ **Performance** - LRU eviction, metrics, and optimized serialization
+
+## Package Structure
+
+```
+dg-cache/
+├── config.go              # Configuration structures and validation
+├── manager.go             # Cache manager (multi-store orchestration)
+├── store.go               # Store, TaggedStore, and Driver interfaces
+├── helpers.go             # Typed retrieval helpers (GetString, GetInt, etc.)
+├── errors.go              # Custom error types
+├── drivers/
+│   ├── memory/           # In-memory cache driver
+│   │   ├── memory.go     # Core driver implementation
+│   │   ├── lru.go        # LRU eviction policy
+│   │   ├── metrics.go    # Metrics collection
+│   │   └── config.go     # Memory driver configuration
+│   └── redis/            # Redis cache driver
+│       ├── redis.go      # Core driver implementation
+│       ├── tagged.go     # Tagged cache support
+│       └── config.go     # Redis driver configuration
+├── serializer/
+│   ├── serializer.go     # Serializer interface
+│   ├── json.go           # JSON serializer
+│   └── msgpack.go        # Msgpack serializer
+└── docs/
+    ├── API.md            # Complete API reference
+    ├── SERIALIZATION.md  # Serialization guide
+    ├── MEMORY_DRIVER.md  # Memory driver documentation
+    └── REDIS_DRIVER.md   # Redis driver documentation
+```
+
+## Core Concepts
+
+### Manager
+The `Manager` is the central orchestrator that manages multiple cache stores, provides a unified interface across all drivers, handles driver registration, and routes cache operations to the appropriate store.
+
+### Store Interface
+Defines the contract that all cache drivers must implement:
+- Basic operations: `Get`, `Put`, `Forget`, `Flush`
+- Batch operations: `GetMultiple`, `PutMultiple`
+- Atomic operations: `Increment`, `Decrement`
+- TTL support: `Forever` (no expiration)
+- Existence checks: `Has`, `Missing`
+
+### Driver
+Extends the Store interface with driver-specific functionality like `Name()` for identification and `Close()` for resource cleanup.
+
+### TaggedStore
+Optional interface for drivers that support cache tagging to group related cache items and flush them together. Currently supported by Redis driver only.
 
 ## Included Drivers
 
@@ -259,33 +308,29 @@ BenchmarkMsgpack_Unmarshal   6,601,837    172.1 ns/op     96 B/op    2 allocs/op
 
 **Msgpack is 2.6x faster for unmarshal operations!**
 
-## License
+## Documentation
 
-MIT License
+For detailed information, see the comprehensive documentation in the `docs/` directory:
+
+- **[API Reference](docs/API.md)** - Complete API documentation for all packages
+- **[Serialization Guide](docs/SERIALIZATION.md)** - Deep dive into JSON and Msgpack serialization
+- **[Memory Driver](docs/MEMORY_DRIVER.md)** - In-memory cache with LRU eviction and metrics
+- **[Redis Driver](docs/REDIS_DRIVER.md)** - Production-ready Redis caching with tagged cache support
+
+### Version Information
+
+- **Current Version:** v1.3.0
+- **Go Version:** 1.21+
+- **Test Coverage:** 88%+
+- **Status:** Production Ready
 
 ## Related Packages
 
-- [dg-redis](https://github.com/donnigundala/dg-redis) - Redis driver for dg-cache
-- [dg-core](https://github.com/donnigundala/dg-core) - Core framework
+- [dg-core](https://github.com/donnigundala/dg-core) - Core framework for dg-framework
+- [dg-database](https://github.com/donnigundala/dg-database) - Database abstraction layer
 
-
-```go
-type MyDriver struct {
-    // ...
-}
-
-func (d *MyDriver) Get(ctx context.Context, key string) (interface{}, error) {
-    // ...
-}
-// ... implement other methods
-```
-
-Register it with the manager:
-
-```go
-manager.RegisterDriver("my-driver", NewMyDriver)
-```
+> **Note:** The `dg-redis` package has been merged into this package as `drivers/redis` in v1.3.0. If you're using the old `dg-redis` package, please migrate to `github.com/donnigundala/dg-cache/drivers/redis`.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
