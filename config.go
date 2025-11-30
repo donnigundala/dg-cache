@@ -2,6 +2,8 @@ package cache
 
 import (
 	"time"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 // Config represents the cache configuration.
@@ -31,6 +33,19 @@ type StoreConfig struct {
 
 	// Options contains driver-specific configuration options.
 	Options map[string]interface{}
+}
+
+// Decode decodes the store options into the target struct.
+func (c StoreConfig) Decode(target interface{}) error {
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Metadata: nil,
+		Result:   target,
+		TagName:  "mapstructure",
+	})
+	if err != nil {
+		return err
+	}
+	return decoder.Decode(c.Options)
 }
 
 // DefaultConfig returns a default cache configuration.

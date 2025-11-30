@@ -9,7 +9,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	cache "github.com/donnigundala/dg-cache"
-	driver "github.com/donnigundala/dg-redis"
+	driver "github.com/donnigundala/dg-cache/drivers/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +35,35 @@ func createDriver(t *testing.T) (cache.Driver, *miniredis.Miniredis) {
 	require.NoError(t, err)
 
 	return d, s
+}
+
+func TestRedis_Configuration(t *testing.T) {
+	s, err := miniredis.Run()
+	require.NoError(t, err)
+	defer s.Close()
+
+	addr := s.Addr()
+	parts := strings.Split(addr, ":")
+	port, _ := strconv.Atoi(parts[1])
+
+	cfg := cache.StoreConfig{
+		Driver: "redis",
+		Prefix: "test",
+		Options: map[string]interface{}{
+			"host":      parts[0],
+			"port":      port,
+			"database":  1,
+			"pool_size": 20,
+		},
+	}
+
+	d, err := driver.NewDriver(cfg)
+	require.NoError(t, err)
+	defer d.Close()
+
+	// Verify connection works
+	err = d.Put(context.Background(), "test", "value", 1*time.Minute)
+	assert.NoError(t, err)
 }
 
 func TestRedis_BasicOperations(t *testing.T) {
@@ -192,4 +221,97 @@ func TestRedis_MultipleTags(t *testing.T) {
 	assert.False(t, has1, "k1 should be deleted")
 	assert.True(t, has2, "k2 should remain")
 	assert.False(t, has3, "k3 should be deleted")
+}
+
+func TestRedis_GetMultiple(t *testing.T) {
+	d, s := createDriver(t)
+	defer s.Close()
+	defer d.Close()
+
+	ctx := context.Background()
+
+	// Setup data
+	d.Put(ctx, "k1", "v1", 1*time.Minute)
+	d.Put(ctx, "k2", "v2", 1*time.Minute)
+
+	// Get multiple
+	vals, err := d.GetMultiple(ctx, []string{"k1", "k2", "k3"})
+	assert.NoError(t, err)
+	assert.Len(t, vals, 2)
+	assert.Equal(t, "v1", vals["k1"])
+	assert.Equal(t, "v2", vals["k2"])
+	assert.NotContains(t, vals, "k3")
+}
+
+func TestRedis_PutMultiple(t *testing.T) {
+	d, s := createDriver(t)
+	defer s.Close()
+	defer d.Close()
+
+	ctx := context.Background()
+
+	items := map[string]interface{}{
+		"k1": "v1",
+		"k2": "v2",
+	}
+
+	err := d.PutMultiple(ctx, items, 1*time.Minute)
+	assert.NoError(t, err)
+
+	// Verify
+	val1, _ := d.Get(ctx, "k1")
+	val2, _ := d.Get(ctx, "k2")
+	assert.Equal(t, "v1", val1)
+	assert.Equal(t, "v2", val2)
+}
+
+func TestRedis_Forever(t *testing.T) {
+	d, s := createDriver(t)
+	defer s.Close()
+	defer d.Close()
+
+	ctx := context.Background()
+
+	err := d.Forever(ctx, "forever_key", "value")
+	assert.NoError(t, err)
+
+	val, err := d.Get(ctx, "forever_key")
+	assert.NoError(t, err)
+	assert.Equal(t, "value", val)
+
+	// Check TTL (should be 0 or -1 depending on implementation, but definitely not expiring soon)
+	// Miniredis returns 0 for no expiration
+	ttl := s.TTL("test:forever_key")
+	assert.Equal(t, time.Duration(0), ttl)
+}
+
+func TestRedis_Flush(t *testing.T) {
+	d, s := createDriver(t)
+	defer s.Close()
+	defer d.Close()
+
+	ctx := context.Background()
+
+	d.Put(ctx, "k1", "v1", 1*time.Minute)
+	d.Put(ctx, "k2", "v2", 1*time.Minute)
+
+	err := d.Flush(ctx)
+	assert.NoError(t, err)
+
+	has1, _ := d.Has(ctx, "k1")
+	has2, _ := d.Has(ctx, "k2")
+	assert.False(t, has1)
+	assert.False(t, has2)
+}
+
+func TestRedis_GettersSetters(t *testing.T) {
+	d, s := createDriver(t)
+	defer s.Close()
+	defer d.Close()
+
+	assert.Equal(t, "redis", d.Name())
+	assert.Equal(t, "test", d.GetPrefix())
+
+	d.SetPrefix("new_prefix")
+	assert.Equal(t, "new_prefix", d.GetPrefix())
 }

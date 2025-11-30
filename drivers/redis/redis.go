@@ -20,21 +20,8 @@ type Driver struct {
 func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
 	// Parse options into Redis config
 	redisConfig := DefaultConfig()
-
-	if val, ok := config.Options["host"].(string); ok {
-		redisConfig.Host = val
-	}
-	if val, ok := config.Options["port"].(int); ok {
-		redisConfig.Port = val
-	}
-	if val, ok := config.Options["password"].(string); ok {
-		redisConfig.Password = val
-	}
-	if val, ok := config.Options["database"].(int); ok {
-		redisConfig.Database = val
-	}
-	if val, ok := config.Options["pool_size"].(int); ok {
-		redisConfig.PoolSize = val
+	if err := config.Decode(&redisConfig); err != nil {
+		return nil, err
 	}
 
 	client, err := NewClient(redisConfig)
