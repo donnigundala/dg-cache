@@ -9,30 +9,30 @@ import (
 // Config represents the cache configuration.
 type Config struct {
 	// DefaultStore is the name of the default cache store to use.
-	DefaultStore string
+	DefaultStore string `mapstructure:"default_store"`
 
 	// Prefix is the global cache key prefix.
 	// This is prepended to all cache keys.
-	Prefix string
+	Prefix string `mapstructure:"prefix"`
 
 	// Stores contains the configuration for each cache store.
-	Stores map[string]StoreConfig
+	Stores map[string]StoreConfig `mapstructure:"stores"`
 }
 
 // StoreConfig represents the configuration for a single cache store.
 type StoreConfig struct {
 	// Driver is the cache driver name (e.g., "redis", "memory").
-	Driver string
+	Driver string `mapstructure:"driver"`
 
 	// Connection is the connection name to use (for drivers that support multiple connections).
-	Connection string
+	Connection string `mapstructure:"connection"`
 
 	// Prefix is the store-specific cache key prefix.
 	// This overrides the global prefix for this store.
-	Prefix string
+	Prefix string `mapstructure:"prefix"`
 
 	// Options contains driver-specific configuration options.
-	Options map[string]interface{}
+	Options map[string]interface{} `mapstructure:"options"`
 }
 
 // Decode decodes the store options into the target struct.
