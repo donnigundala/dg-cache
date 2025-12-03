@@ -10,8 +10,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
-github.com/donnigundala/dg-redis v1.1.1 h1:hJfoGaOc5XTByczK6Sa4bNsL2kqx80P+As5pWwiN/Ws=
-github.com/donnigundala/dg-redis v1.1.1/go.mod h1:CeUwQEm8ZYNaQULfkHtoSrAXmV9c9j8Tb99Sdy9LOek=
+github.com/donnigundala/dg-core v1.3.0 h1:/haMVcJhMzkTZVM2elE2Sonj4Q5PC7OfrnjVgPYbN+k=
+github.com/donnigundala/dg-core v1.3.0/go.mod h1:yJrjqnsrw26i4MfRBm4N7yuM1sDbsLlDIrDj/SC6/n8=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
