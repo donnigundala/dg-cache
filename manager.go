@@ -260,6 +260,12 @@ func (m *Manager) Pull(ctx context.Context, key string) (interface{}, error) {
 	return value, nil
 }
 
+// Stop stops the cache manager gracefully.
+// This implements the Stoppable interface.
+func (m *Manager) Stop(ctx context.Context) error {
+	return m.Close()
+}
+
 // Close closes all cache stores and releases resources.
 func (m *Manager) Close() error {
 	m.mu.Lock()

@@ -26,7 +26,7 @@ type CacheServiceProvider struct {
 
 // Name returns the name of the plugin.
 func (p *CacheServiceProvider) Name() string {
-	return "dg-cache"
+	return "cache"
 }
 
 // Version returns the version of the plugin.
