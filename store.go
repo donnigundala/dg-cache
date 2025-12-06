@@ -40,6 +40,9 @@ type Store interface {
 	// Returns nil if the key doesn't exist.
 	Forget(ctx context.Context, key string) error
 
+	// ForgetMultiple removes multiple values from the cache.
+	ForgetMultiple(ctx context.Context, keys []string) error
+
 	// Flush removes all items from the cache.
 	Flush(ctx context.Context) error
 

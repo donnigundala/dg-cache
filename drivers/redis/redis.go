@@ -168,6 +168,15 @@ func (d *Driver) Forget(ctx context.Context, key string) error {
 	return d.client.Del(ctx, d.prefixKey(key)).Err()
 }
 
+// ForgetMultiple removes multiple values from the cache.
+func (d *Driver) ForgetMultiple(ctx context.Context, keys []string) error {
+	prefixedKeys := make([]string, len(keys))
+	for i, key := range keys {
+		prefixedKeys[i] = d.prefixKey(key)
+	}
+	return d.client.Del(ctx, prefixedKeys...).Err()
+}
+
 // Flush removes all items from the cache.
 func (d *Driver) Flush(ctx context.Context) error {
 	return d.client.FlushDB(ctx).Err()

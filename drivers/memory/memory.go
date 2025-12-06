@@ -342,6 +342,17 @@ func (d *Driver) Forget(ctx context.Context, key string) error {
 	return nil
 }
 
+// ForgetMultiple removes multiple values from the cache.
+func (d *Driver) ForgetMultiple(ctx context.Context, keys []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for _, key := range keys {
+		delete(d.items, d.prefixKey(key))
+	}
+	return nil
+}
+
 // Flush removes all items from the cache.
 func (d *Driver) Flush(ctx context.Context) error {
 	d.mu.Lock()

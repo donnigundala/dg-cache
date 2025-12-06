@@ -41,6 +41,15 @@ func (m *Manager) RegisterDriver(name string, factory DriverFactory) {
 	m.drivers[name] = factory
 }
 
+// Verify Manager implements Cache interface
+var _ Cache = (*Manager)(nil)
+
+// DefaultStore returns the default cache store.
+func (m *Manager) DefaultStore() Store {
+	store, _ := m.Store("")
+	return store
+}
+
 // Store returns the cache store with the given name.
 // If name is empty, returns the default store.
 func (m *Manager) Store(name string) (Store, error) {
@@ -171,6 +180,15 @@ func (m *Manager) Forget(ctx context.Context, key string) error {
 		return err
 	}
 	return store.Forget(ctx, key)
+}
+
+// ForgetMultiple removes multiple values from the default cache store.
+func (m *Manager) ForgetMultiple(ctx context.Context, keys []string) error {
+	store, err := m.Store("")
+	if err != nil {
+		return err
+	}
+	return store.ForgetMultiple(ctx, keys)
 }
 
 // Flush removes all items from the default cache store.
