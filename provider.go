@@ -31,7 +31,7 @@ func (p *CacheServiceProvider) Name() string {
 
 // Version returns the version of the plugin.
 func (p *CacheServiceProvider) Version() string {
-	return "1.4.0"
+	return "1.6.0"
 }
 
 // Dependencies returns the list of dependencies.
@@ -47,22 +47,35 @@ func (p *CacheServiceProvider) Register(app foundation.Application) error {
 		cfg = DefaultConfig()
 	}
 
-	// Register the cache manager as a singleton
-	app.Singleton("cache", func() (interface{}, error) {
-		manager, err := NewManager(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create cache manager: %w", err)
-		}
+	// Create manager eagerly to avoid deadlock in generic container
+	// recursive Make() calls are not supported by the container implementation
+	manager, err := NewManager(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create cache manager: %w", err)
+	}
 
-		// Register driver factories if provided
-		if p.DriverFactories != nil {
-			for name, factory := range p.DriverFactories {
-				manager.RegisterDriver(name, factory)
+	// Register driver factories if provided
+	if p.DriverFactories != nil {
+		for name, factory := range p.DriverFactories {
+			manager.RegisterDriver(name, factory)
+		}
+	}
+
+	// Register the cache manager instance
+	app.Instance("cache", manager)
+
+	// Auto-register named stores in container
+	for storeName := range cfg.Stores {
+		name := storeName // capture for closure
+		app.Singleton(fmt.Sprintf("cache.%s", name), func() (interface{}, error) {
+			// Use captured manager instance to avoid recursive app.Make("cache")
+			store, err := manager.Store(name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get store %s: %w", name, err)
 			}
-		}
-
-		return manager, nil
-	})
+			return store, nil
+		})
+	}
 
 	return nil
 }

@@ -5,15 +5,26 @@ import (
 	"time"
 
 	cache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-cache/compression"
+	"github.com/donnigundala/dg-cache/reliability"
 	"github.com/donnigundala/dg-cache/serializer"
 	"github.com/redis/go-redis/v9"
 )
+
+// Metrics tracks Redis cache statistics (client-side).
+type Metrics struct {
+	Hits    int64
+	Misses  int64
+	Sets    int64
+	Deletes int64
+}
 
 // Driver is a Redis cache driver.
 type Driver struct {
 	client     *redis.Client
 	prefix     string
 	serializer serializer.Serializer
+	metrics    Metrics // Simple atomic counters manually managed
 }
 
 // NewDriver creates a new Redis cache driver.
@@ -40,11 +51,42 @@ func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
 		}
 	}
 
-	return &Driver{
+	// Wrap with compression if enabled
+	if val, ok := config.Options["compression"].(string); ok {
+		switch val {
+		case "gzip":
+			comp := compression.NewGzipCompressor(compression.DefaultCompression) // Use default or config
+			ser = serializer.NewCompressedSerializer(ser, comp)
+		}
+	}
+
+	var driver cache.Driver = &Driver{
 		client:     client,
 		prefix:     config.Prefix,
 		serializer: ser,
-	}, nil
+	}
+
+	// Wrap with circuit breaker if enabled
+	if cbConfig, ok := config.Options["circuit_breaker"].(map[string]interface{}); ok {
+		enabled, _ := cbConfig["enabled"].(bool)
+		if enabled {
+			threshold, _ := cbConfig["threshold"].(int)
+			if threshold == 0 {
+				threshold = 5 // Default
+			}
+
+			timeoutStr, _ := cbConfig["timeout"].(string)
+			timeout, err := time.ParseDuration(timeoutStr)
+			if err != nil {
+				timeout = 1 * time.Minute // Default
+			}
+
+			breaker := reliability.NewThresholdBreaker(threshold, timeout)
+			driver = reliability.NewCircuitBreakerDriver(driver, breaker)
+		}
+	}
+
+	return driver, nil
 }
 
 // NewDriverWithClient creates a new Redis cache driver with an existing client.
@@ -68,6 +110,7 @@ func (d *Driver) prefixKey(key string) string {
 func (d *Driver) Get(ctx context.Context, key string) (interface{}, error) {
 	data, err := d.client.Get(ctx, d.prefixKey(key)).Bytes()
 	if err == redis.Nil {
+		d.recordMiss()
 		return nil, cache.ErrKeyNotFound
 	}
 	if err != nil {
@@ -78,9 +121,11 @@ func (d *Driver) Get(ctx context.Context, key string) (interface{}, error) {
 	var result interface{}
 	if err := d.serializer.Unmarshal(data, &result); err != nil {
 		// Fallback: return as string for backward compatibility
+		d.recordHit()
 		return string(data), nil
 	}
 
+	d.recordHit()
 	return result, nil
 }
 
@@ -130,7 +175,11 @@ func (d *Driver) Put(ctx context.Context, key string, value interface{}, ttl tim
 	if err != nil {
 		return err
 	}
-	return d.client.Set(ctx, d.prefixKey(key), data, ttl).Err()
+	err = d.client.Set(ctx, d.prefixKey(key), data, ttl).Err()
+	if err == nil {
+		d.recordSet()
+	}
+	return err
 }
 
 // PutMultiple stores multiple values in the cache.
@@ -165,7 +214,11 @@ func (d *Driver) Forever(ctx context.Context, key string, value interface{}) err
 
 // Forget removes a value from the cache.
 func (d *Driver) Forget(ctx context.Context, key string) error {
-	return d.client.Del(ctx, d.prefixKey(key)).Err()
+	err := d.client.Del(ctx, d.prefixKey(key)).Err()
+	if err == nil {
+		d.recordDelete()
+	}
+	return err
 }
 
 // ForgetMultiple removes multiple values from the cache.

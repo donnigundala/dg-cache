@@ -11,13 +11,15 @@ import (
 // Driver is an in-memory cache driver.
 // It stores cache items in memory with TTL support, size limits, and LRU eviction.
 type Driver struct {
-	items  map[string]*cache.Item
-	lru    *lruList
-	nodes  map[string]*lruNode // key -> LRU node mapping
-	mu     sync.RWMutex
-	prefix string
-	ticker *time.Ticker
-	done   chan bool
+	items   map[string]*cache.Item
+	lru     *lruList
+	nodes   map[string]*lruNode            // key -> LRU node mapping
+	tags    map[string]map[string]struct{} // tag -> set of keys
+	keyTags map[string][]string            // key -> list of tags
+	mu      sync.RWMutex
+	prefix  string
+	ticker  *time.Ticker
+	done    chan bool
 
 	config  Config
 	metrics *Metrics
@@ -50,12 +52,14 @@ func NewDriver(storeConfig cache.StoreConfig) (cache.Driver, error) {
 	}
 
 	d := &Driver{
-		items:  make(map[string]*cache.Item),
-		lru:    newLRUList(),
-		nodes:  make(map[string]*lruNode),
-		prefix: "",
-		done:   make(chan bool),
-		config: config,
+		items:   make(map[string]*cache.Item),
+		lru:     newLRUList(),
+		nodes:   make(map[string]*lruNode),
+		tags:    make(map[string]map[string]struct{}),
+		keyTags: make(map[string][]string),
+		prefix:  "",
+		done:    make(chan bool),
+		config:  config,
 	}
 
 	if config.EnableMetrics {
@@ -89,7 +93,9 @@ func (d *Driver) removeExpired() {
 	now := time.Now()
 	for key, item := range d.items {
 		if !item.ExpiresAt.IsZero() && item.ExpiresAt.Before(now) {
+			d.removeKeyTags(key)
 			delete(d.items, key)
+			delete(d.nodes, key)
 		}
 	}
 }
@@ -174,6 +180,7 @@ func (d *Driver) evictOne() bool {
 			if d.metrics != nil {
 				d.metrics.RecordEviction(size)
 			}
+			d.removeKeyTags(key)
 			delete(d.items, key)
 			delete(d.nodes, key)
 			return true
@@ -229,7 +236,11 @@ func (d *Driver) GetMultiple(ctx context.Context, keys []string) (map[string]int
 func (d *Driver) Put(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	return d.put(key, value, ttl)
+}
 
+// put is the internal unlocked implementation of Put.
+func (d *Driver) put(key string, value interface{}, ttl time.Duration) error {
 	prefixedKey := d.prefixKey(key)
 	newSize := d.estimateSize(value)
 
@@ -337,8 +348,15 @@ func (d *Driver) Forever(ctx context.Context, key string, value interface{}) err
 func (d *Driver) Forget(ctx context.Context, key string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	return d.forget(key)
+}
 
-	delete(d.items, d.prefixKey(key))
+// forget is the internal unlocked implementation of Forget.
+func (d *Driver) forget(key string) error {
+	prefixedKey := d.prefixKey(key)
+	d.removeKeyTags(prefixedKey)
+	delete(d.items, prefixedKey)
+	delete(d.nodes, prefixedKey)
 	return nil
 }
 
@@ -348,7 +366,10 @@ func (d *Driver) ForgetMultiple(ctx context.Context, keys []string) error {
 	defer d.mu.Unlock()
 
 	for _, key := range keys {
-		delete(d.items, d.prefixKey(key))
+		prefixedKey := d.prefixKey(key)
+		d.removeKeyTags(prefixedKey)
+		delete(d.items, prefixedKey)
+		delete(d.nodes, prefixedKey)
 	}
 	return nil
 }
@@ -358,7 +379,12 @@ func (d *Driver) Flush(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// Clear everything
 	d.items = make(map[string]*cache.Item)
+	d.nodes = make(map[string]*lruNode)
+	d.lru = newLRUList()
+	d.tags = make(map[string]map[string]struct{})
+	d.keyTags = make(map[string][]string)
 	return nil
 }
 
@@ -396,10 +422,10 @@ func (d *Driver) Name() string {
 	return "memory"
 }
 
-// Stats returns cache statistics (if metrics enabled).
-func (d *Driver) Stats() Stats {
+// Stats returns a snapshot of current cache statistics.
+func (d *Driver) Stats() cache.Stats {
 	if d.metrics == nil {
-		return Stats{}
+		return cache.Stats{}
 	}
 	return d.metrics.Stats()
 }

@@ -32,17 +32,25 @@ type Config struct {
 
 	// Timeout is the dial timeout.
 	Timeout time.Duration
+
+	// MinRetryBackoff is the minimum backoff between retries.
+	MinRetryBackoff time.Duration
+
+	// MaxRetryBackoff is the maximum backoff between retries.
+	MaxRetryBackoff time.Duration
 }
 
 // DefaultConfig returns a default Redis configuration.
 func DefaultConfig() Config {
 	return Config{
-		Host:         "localhost",
-		Port:         6379,
-		Database:     0,
-		PoolSize:     10,
-		MinIdleConns: 2,
-		MaxRetries:   3,
-		Timeout:      5 * time.Second,
+		Host:            "localhost",
+		Port:            6379,
+		Database:        0,
+		PoolSize:        10,
+		MinIdleConns:    2,
+		MaxRetries:      3,
+		Timeout:         5 * time.Second,
+		MinRetryBackoff: 8 * time.Millisecond,
+		MaxRetryBackoff: 512 * time.Millisecond,
 	}
 }

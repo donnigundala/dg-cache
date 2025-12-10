@@ -32,4 +32,44 @@ type Cache interface {
 	// Store Management
 	Store(name string) (Store, error)
 	DefaultStore() Store
+
+	// Typed Helpers
+	GetAs(ctx context.Context, key string, dest interface{}) error
+	GetString(ctx context.Context, key string) (string, error)
+	GetInt(ctx context.Context, key string) (int, error)
+	GetInt64(ctx context.Context, key string) (int64, error)
+	GetFloat64(ctx context.Context, key string) (float64, error)
+	GetBool(ctx context.Context, key string) (bool, error)
+}
+
+// Stats represents cache statistics at a point in time.
+type Stats struct {
+	// Hits is the number of cache hits.
+	Hits int64
+
+	// Misses is the number of cache misses.
+	Misses int64
+
+	// Sets is the number of set operations.
+	Sets int64
+
+	// Deletes is the number of delete operations.
+	Deletes int64
+
+	// Evictions is the number of evicted items.
+	Evictions int64
+
+	// ItemCount is the current number of items in the cache.
+	ItemCount int
+
+	// BytesUsed is the estimated total size of cached items in bytes.
+	BytesUsed int64
+
+	// HitRate is the cache hit rate (hits / (hits + misses)).
+	HitRate float64
+}
+
+// Observable is an interface for drivers that expose statistics.
+type Observable interface {
+	Stats() Stats
 }

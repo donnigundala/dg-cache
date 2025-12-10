@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/donnigundala/dg-core/contracts/foundation"
 )
 
 // GetAs retrieves a value and unmarshals it into the provided destination pointer.
@@ -157,4 +159,89 @@ func (m *Manager) GetBool(ctx context.Context, key string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("value is not a bool: got %T", val)
+}
+
+// -----------------------------------------------------------------------------
+// Container Integration Helpers (v1.6.0)
+// -----------------------------------------------------------------------------
+
+// Resolve resolves the main cache manager from the application container.
+func Resolve(app foundation.Application) (Cache, error) {
+	instance, err := app.Make("cache")
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve cache: %w", err)
+	}
+
+	cache, ok := instance.(Cache)
+	if !ok {
+		return nil, fmt.Errorf("resolved instance is not a Cache")
+	}
+
+	return cache, nil
+}
+
+// MustResolve resolves the cache manager or panics.
+func MustResolve(app foundation.Application) Cache {
+	cache, err := Resolve(app)
+	if err != nil {
+		panic(err)
+	}
+	return cache
+}
+
+// ResolveStore resolves a named cache store from the container.
+func ResolveStore(app foundation.Application, name string) (Store, error) {
+	instance, err := app.Make(fmt.Sprintf("cache.%s", name))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve cache store %s: %w", name, err)
+	}
+
+	store, ok := instance.(Store)
+	if !ok {
+		return nil, fmt.Errorf("resolved instance is not a Store")
+	}
+
+	return store, nil
+}
+
+// MustResolveStore resolves a named store or panics.
+func MustResolveStore(app foundation.Application, name string) Store {
+	store, err := ResolveStore(app, name)
+	if err != nil {
+		panic(err)
+	}
+	return store
+}
+
+// Injectable provides a convenient way to inject cache dependencies.
+// Include this struct in your services to easily access cache stores.
+type Injectable struct {
+	app foundation.Application
+}
+
+// NewInjectable creates a new Injectable instance.
+func NewInjectable(app foundation.Application) *Injectable {
+	return &Injectable{app: app}
+}
+
+// Cache returns the main cache manager.
+// Panics if cache cannot be resolved.
+func (i *Injectable) Cache() Cache {
+	return MustResolve(i.app)
+}
+
+// Store returns a named cache store.
+// Panics if the store cannot be resolved.
+func (i *Injectable) Store(name string) Store {
+	return MustResolveStore(i.app, name)
+}
+
+// TryStore returns a named store or nil if it doesn't exist.
+// This is safe to use for optional cache stores.
+func (i *Injectable) TryStore(name string) Store {
+	store, err := ResolveStore(i.app, name)
+	if err != nil {
+		return nil
+	}
+	return store
 }

@@ -8,12 +8,12 @@ import (
 
 func TestCacheServiceProvider_Name(t *testing.T) {
 	provider := &CacheServiceProvider{}
-	assert.Equal(t, "dg-cache", provider.Name())
+	assert.Equal(t, "cache", provider.Name())
 }
 
 func TestCacheServiceProvider_Version(t *testing.T) {
 	provider := &CacheServiceProvider{}
-	assert.Equal(t, "1.4.0", provider.Version())
+	assert.Equal(t, "1.6.0", provider.Version())
 }
 
 func TestCacheServiceProvider_Dependencies(t *testing.T) {

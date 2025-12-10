@@ -15,7 +15,10 @@ go get github.com/donnigundala/dg-cache@v1.3.0
 - 💾 **Built-in Drivers** - Memory (testing) and Redis (production) included
 - 🔧 **Extensible** - Easy to add custom drivers
 - 📦 **Serialization** - Automatic marshaling/unmarshaling with JSON or Msgpack
-- 🏷️ **Tagged Cache** - Group related items with tags (Redis driver)
+- 🗜️ **Compression** - Transparent Gzip compression for large values
+- 📊 **Observability** - Standardized metrics and Prometheus exporter
+- 🛡️ **Reliability** - Circuit breaker and enhanced retry logic
+- 🏷️ **Tagged Cache** - Group related items with tags (Redis and Memory drivers)
 - ⚡ **Performance** - LRU eviction, metrics, and optimized serialization
 
 ## Package Structure
@@ -65,13 +68,14 @@ Defines the contract that all cache drivers must implement:
 Extends the Store interface with driver-specific functionality like `Name()` for identification and `Close()` for resource cleanup.
 
 ### TaggedStore
-Optional interface for drivers that support cache tagging to group related cache items and flush them together. Currently supported by Redis driver only.
+Optional interface for drivers that support cache tagging to group related cache items and flush them together. Supported by both Redis and Memory drivers.
 
 ## Included Drivers
 
 ### Memory Driver (`drivers/memory`)
 - In-memory caching for development/testing
 - LRU eviction with configurable size limits
+- Tagged cache support (v1.6.1)
 - Metrics tracking (hits, misses, evictions)
 - Thread-safe operations
 
@@ -219,6 +223,65 @@ redisStore.Put(ctx, "key", "value", 0)
 manager.Put(ctx, "key", "value", 0)
 ```
 
+## Container Integration (v1.6.0)
+
+As of v1.6.0, dg-cache is fully integrated with the dg-core container system. Named cache stores are automatically registered in the container as `cache.<name>`.
+
+### Access Patterns
+
+#### 1. Direct Resolution
+You can resolve specific stores directly from the container:
+
+```go
+// Resolve named stores
+redisStore, _ := app.Make("cache.redis")
+memStore, _ := app.Make("cache.memory")
+
+// Resolve main cache manager
+cacheManager, _ := app.Make("cache")
+```
+
+#### 2. Helper Functions
+Global helper functions provide a more convenient and type-safe way to resolve the cache:
+
+```go
+import "github.com/donnigundala/dg-cache"
+
+// Resolve main cache
+mgr := cache.MustResolve(app)
+
+// Resolve named store
+redis := cache.MustResolveStore(app, "redis")
+```
+
+#### 3. Injectable Pattern (Recommended)
+The `Injectable` struct simplifies dependency injection in your services:
+
+```go
+import (
+    "github.com/donnigundala/dg-core/foundation"
+    "github.com/donnigundala/dg-cache"
+)
+
+type UserService struct {
+    inject *cache.Injectable
+}
+
+func NewUserService(app foundation.Application) *UserService {
+    return &UserService{
+        inject: cache.NewInjectable(app),
+    }
+}
+
+func (s *UserService) CacheUser(ctx context.Context, user *User) {
+    // Use default cache store
+    s.inject.Cache().Put(ctx, "user:1", user, 0)
+
+    // Use specific store (e.g. redis)
+    s.inject.Store("redis").Put(ctx, "user:1", user, 0)
+}
+```
+
 ## Serialization
 
 ### Supported Types
@@ -241,8 +304,19 @@ manager.Put(ctx, "key", "value", 0)
 - Better for production
 
 ```go
+```go
 Options: map[string]interface{}{
     "serializer": "msgpack",  // or "json"
+}
+```
+
+### Compression
+
+Enable transparent Gzip compression to save storage space for large values (Redis driver only):
+
+```go
+Options: map[string]interface{}{
+    "compression": "gzip",
 }
 ```
 
@@ -280,6 +354,58 @@ stats := driver.Stats()
 fmt.Printf("Hit rate: %.2f%%\n", stats.HitRate*100)
 fmt.Printf("Items: %d, Bytes: %d\n", stats.ItemCount, stats.BytesUsed)
 ```
+
+## Observability
+
+### Standardized Metrics
+All drivers implement the `Observable` interface, exposing a `Stats()` method that returns:
+- `Hits` / `Misses`
+- `Sets` / `Deletes` / `Evictions`
+- `ItemCount` / `BytesUsed` (estimated)
+
+### Prometheus Exporter
+Standard integration with Prometheus is provided via the `observability` package:
+
+```go
+import (
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/donnigundala/dg-cache/observability"
+)
+
+// ... setup cache ...
+
+// Create and register collector
+collector := observability.NewPrometheusCollector(manager.DefaultStore().(cache.Observable), "myapp", "cache")
+prometheus.MustRegister(collector)
+```
+
+## Reliability Features
+
+### Enhanced Retries (Redis)
+Configure exponential backoff for Redis connections:
+
+```go
+Options: map[string]interface{}{
+    "max_retries":       3,
+    "min_retry_backoff": 8 * time.Millisecond,
+    "max_retry_backoff": 512 * time.Millisecond,
+}
+```
+
+### Circuit Breaker
+Protect your application from cascading cache failures. If the cache becomes unresponsive, the circuit breaker opens and fails fast.
+
+```go
+Options: map[string]interface{}{
+    "circuit_breaker": map[string]interface{}{
+        "enabled":   true,
+        "threshold": 5,                 // Fail after 5 errors
+        "timeout":   1 * time.Minute,   // Reset after 1 minute
+    },
+}
+```
+
+## Creating Custom Drivers
 
 ## Creating Custom Drivers
 

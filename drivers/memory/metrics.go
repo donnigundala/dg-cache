@@ -1,6 +1,10 @@
 package memory
 
-import "sync"
+import (
+	"sync"
+
+	cache "github.com/donnigundala/dg-cache"
+)
 
 // Metrics tracks cache statistics.
 type Metrics struct {
@@ -73,7 +77,7 @@ func (m *Metrics) RecordEviction(bytes int64) {
 }
 
 // Stats returns a snapshot of current cache statistics.
-func (m *Metrics) Stats() Stats {
+func (m *Metrics) Stats() cache.Stats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -83,7 +87,7 @@ func (m *Metrics) Stats() Stats {
 		hitRate = float64(m.hits) / float64(total)
 	}
 
-	return Stats{
+	return cache.Stats{
 		Hits:      m.hits,
 		Misses:    m.misses,
 		Sets:      m.sets,
@@ -107,31 +111,4 @@ func (m *Metrics) Reset() {
 	m.evictions = 0
 	m.itemCount = 0
 	m.bytesUsed = 0
-}
-
-// Stats represents cache statistics at a point in time.
-type Stats struct {
-	// Hits is the number of cache hits.
-	Hits int64
-
-	// Misses is the number of cache misses.
-	Misses int64
-
-	// Sets is the number of set operations.
-	Sets int64
-
-	// Deletes is the number of delete operations.
-	Deletes int64
-
-	// Evictions is the number of evicted items.
-	Evictions int64
-
-	// ItemCount is the current number of items in the cache.
-	ItemCount int
-
-	// BytesUsed is the estimated total size of cached items in bytes.
-	BytesUsed int64
-
-	// HitRate is the cache hit rate (hits / (hits + misses)).
-	HitRate float64
 }
