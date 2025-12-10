@@ -31,7 +31,7 @@ func (p *CacheServiceProvider) Name() string {
 
 // Version returns the version of the plugin.
 func (p *CacheServiceProvider) Version() string {
-	return "1.6.0"
+	return "1.6.2"
 }
 
 // Dependencies returns the list of dependencies.
