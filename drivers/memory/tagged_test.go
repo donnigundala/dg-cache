@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTaggedCache(t *testing.T) {
-	driver, err := NewDriver(cache.StoreConfig{
+	driver, err := NewDriver(dgcache.StoreConfig{
 		Driver: "memory",
 	})
 	assert.NoError(t, err)
@@ -55,7 +56,7 @@ func TestTaggedCache(t *testing.T) {
 }
 
 func TestTaggedCache_Cleanup(t *testing.T) {
-	driver, err := NewDriver(cache.StoreConfig{})
+	driver, err := NewDriver(dgcache.StoreConfig{})
 	assert.NoError(t, err)
 	ctx := context.Background()
 	memDriver := driver.(*Driver)

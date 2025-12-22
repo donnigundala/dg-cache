@@ -1,10 +1,11 @@
-package cache_test
+package dgcache_test
 
 import (
 	"context"
 	"testing"
 
 	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 	"github.com/donnigundala/dg-cache/drivers/memory"
 	"github.com/donnigundala/dg-core/foundation"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 // -----------------------------------------------------------------------------
 
 func TestManager_GetAs(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 
 	type User struct {
 		ID   int
@@ -32,7 +33,7 @@ func TestManager_GetAs(t *testing.T) {
 }
 
 func TestManager_GetString(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 	ctx := context.Background()
 
 	// Verify method exists
@@ -40,7 +41,7 @@ func TestManager_GetString(t *testing.T) {
 }
 
 func TestManager_GetInt(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 	ctx := context.Background()
 
 	// Verify method exists
@@ -48,7 +49,7 @@ func TestManager_GetInt(t *testing.T) {
 }
 
 func TestManager_GetInt64(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 	ctx := context.Background()
 
 	// Verify method exists
@@ -56,7 +57,7 @@ func TestManager_GetInt64(t *testing.T) {
 }
 
 func TestManager_GetFloat64(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 	ctx := context.Background()
 
 	// Verify method exists
@@ -64,7 +65,7 @@ func TestManager_GetFloat64(t *testing.T) {
 }
 
 func TestManager_GetBool(t *testing.T) {
-	manager, _ := cache.NewManager(cache.DefaultConfig())
+	manager, _ := dgcache.NewManager(dgcache.DefaultConfig())
 	ctx := context.Background()
 
 	// Verify method exists
@@ -77,14 +78,17 @@ func TestManager_GetBool(t *testing.T) {
 
 func TestResolve(t *testing.T) {
 	app := foundation.New(".")
-	config := cache.DefaultConfig()
+	config := dgcache.DefaultConfig()
 
-	provider := &cache.CacheServiceProvider{Config: config}
+	provider := &dgcache.CacheServiceProvider{Config: config}
 	err := provider.Register(app)
 	assert.NoError(t, err)
 
+	err = provider.Boot(app)
+	assert.NoError(t, err)
+
 	// Test Resolve
-	c, err := cache.Resolve(app)
+	c, err := dgcache.Resolve(app)
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 }
@@ -93,7 +97,7 @@ func TestResolve_Error(t *testing.T) {
 	app := foundation.New(".")
 
 	// Test Resolve without registration
-	c, err := cache.Resolve(app)
+	c, err := dgcache.Resolve(app)
 	assert.Error(t, err)
 	assert.Nil(t, c)
 	assert.Contains(t, err.Error(), "failed to resolve cache")
@@ -101,14 +105,17 @@ func TestResolve_Error(t *testing.T) {
 
 func TestMustResolve(t *testing.T) {
 	app := foundation.New(".")
-	config := cache.DefaultConfig()
+	config := dgcache.DefaultConfig()
 
-	provider := &cache.CacheServiceProvider{Config: config}
+	provider := &dgcache.CacheServiceProvider{Config: config}
 	err := provider.Register(app)
 	assert.NoError(t, err)
 
+	err = provider.Boot(app)
+	assert.NoError(t, err)
+
 	// Test MustResolve
-	c := cache.MustResolve(app)
+	c := dgcache.MustResolve(app)
 	assert.NotNil(t, c)
 }
 
@@ -117,30 +124,33 @@ func TestMustResolve_Panic(t *testing.T) {
 
 	// Test MustResolve panics without registration
 	assert.Panics(t, func() {
-		cache.MustResolve(app)
+		dgcache.MustResolve(app)
 	})
 }
 
 func TestResolveStore(t *testing.T) {
 	app := foundation.New(".")
-	config := cache.DefaultConfig()
+	config := dgcache.DefaultConfig()
 
 	// Add named store
-	config = config.WithStore("redis", cache.StoreConfig{
+	config = config.WithStore("redis", dgcache.StoreConfig{
 		Driver: "memory", // Use memory driver for test
 	})
 
-	provider := &cache.CacheServiceProvider{
+	provider := &dgcache.CacheServiceProvider{
 		Config: config,
-		DriverFactories: map[string]cache.DriverFactory{
+		DriverFactories: map[string]dgcache.DriverFactory{
 			"memory": memory.NewDriver,
 		},
 	}
 	err := provider.Register(app)
 	assert.NoError(t, err)
 
+	err = provider.Boot(app)
+	assert.NoError(t, err)
+
 	// Test ResolveStore
-	store, err := cache.ResolveStore(app, "redis")
+	store, err := dgcache.ResolveStore(app, "redis")
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
 }
@@ -171,6 +181,9 @@ func TestMustResolveStore(t *testing.T) {
 	err := provider.Register(app)
 	assert.NoError(t, err)
 
+	err = provider.Boot(app)
+	assert.NoError(t, err)
+
 	// Test MustResolveStore
 	store := cache.MustResolveStore(app, "redis")
 	assert.NotNil(t, store)
@@ -199,6 +212,9 @@ func TestInjectable(t *testing.T) {
 		},
 	}
 	err := provider.Register(app)
+	assert.NoError(t, err)
+
+	err = provider.Boot(app)
 	assert.NoError(t, err)
 
 	// Test Injectable

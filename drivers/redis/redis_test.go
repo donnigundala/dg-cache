@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 	driver "github.com/donnigundala/dg-cache/drivers/redis"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func createDriver(t *testing.T) (cache.Driver, *miniredis.Miniredis) {
 	parts := strings.Split(addr, ":")
 	port, _ := strconv.Atoi(parts[1])
 
-	cfg := cache.StoreConfig{
+	cfg := dgcache.StoreConfig{
 		Driver: "redis",
 		Prefix: "test",
 		Options: map[string]interface{}{
@@ -46,7 +47,7 @@ func TestRedis_Configuration(t *testing.T) {
 	parts := strings.Split(addr, ":")
 	port, _ := strconv.Atoi(parts[1])
 
-	cfg := cache.StoreConfig{
+	cfg := dgcache.StoreConfig{
 		Driver: "redis",
 		Prefix: "test",
 		Options: map[string]interface{}{
@@ -117,7 +118,7 @@ func TestRedis_TTL(t *testing.T) {
 
 	// Should be gone
 	val, err := d.Get(ctx, "ttl_key")
-	assert.Equal(t, cache.ErrKeyNotFound, err)
+	assert.Equal(t, dgcache.ErrKeyNotFound, err)
 	assert.Nil(t, val)
 }
 
@@ -148,30 +149,10 @@ func TestRedis_TaggedCache(t *testing.T) {
 	defer s.Close()
 	defer d.Close()
 
-	// We need to cast to TaggedStore to use Tags
-	// But wait, the Driver struct doesn't implement Tags directly,
-	// it implements the method that returns TaggedStore.
-	// But Driver interface in dgcore-cache doesn't have Tags() method.
-	// Only TaggedStore interface has Tags().
-	// However, our redis.Driver struct has a Tags() method.
-	// So we need to type assert.
-
-	// Wait, in my implementation of redis.go, I defined:
-	// func (d *Driver) Tags(tags ...string) cache.TaggedStore
-
-	// So I can cast d to interface{ Tags(...string) cache.TaggedStore }
-
-	type Taggable interface {
-		Tags(tags ...string) cache.TaggedStore
-	}
-
-	taggable, ok := d.(Taggable)
-	require.True(t, ok, "Driver should implement Tags()")
-
 	ctx := context.Background()
 
 	// Put tagged item
-	tagged := taggable.Tags("users", "premium")
+	tagged := d.(cache.TaggedStore).Tags("users", "premium")
 	err := tagged.Put(ctx, "user:1", "data", 1*time.Minute)
 	assert.NoError(t, err)
 
@@ -181,7 +162,7 @@ func TestRedis_TaggedCache(t *testing.T) {
 	assert.Equal(t, "data", val)
 
 	// Flush tags
-	err = tagged.FlushTags(ctx, "premium")
+	err = tagged.Flush(ctx) // In v2 we use Flush() on TaggedStore instead of FlushTags
 	assert.NoError(t, err)
 
 	// Verify it's gone
@@ -195,23 +176,19 @@ func TestRedis_MultipleTags(t *testing.T) {
 	defer s.Close()
 	defer d.Close()
 
-	type Taggable interface {
-		Tags(tags ...string) cache.TaggedStore
-	}
-	taggable := d.(Taggable)
 	ctx := context.Background()
 
 	// Item with tag1
-	taggable.Tags("tag1").Put(ctx, "k1", "v1", 1*time.Minute)
+	d.(cache.TaggedStore).Tags("tag1").Put(ctx, "k1", "v1", 1*time.Minute)
 
 	// Item with tag2
-	taggable.Tags("tag2").Put(ctx, "k2", "v2", 1*time.Minute)
+	d.(cache.TaggedStore).Tags("tag2").Put(ctx, "k2", "v2", 1*time.Minute)
 
 	// Item with both
-	taggable.Tags("tag1", "tag2").Put(ctx, "k3", "v3", 1*time.Minute)
+	d.(cache.TaggedStore).Tags("tag1", "tag2").Put(ctx, "k3", "v3", 1*time.Minute)
 
 	// Flush tag1
-	taggable.Tags("tag1").FlushTags(ctx)
+	d.(cache.TaggedStore).Tags("tag1").Flush(ctx)
 
 	// k1 and k3 should be gone
 	has1, _ := d.Has(ctx, "k1")

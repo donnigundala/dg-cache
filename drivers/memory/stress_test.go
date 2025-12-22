@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/stretchr/testify/assert"
 )
 
 // TestConcurrency_ReadWrite verifies safe concurrent access for Get and Put.
 func TestConcurrency_ReadWrite(t *testing.T) {
-	driver, err := NewDriver(cache.StoreConfig{
+	driver, err := NewDriver(dgcache.StoreConfig{
 		Driver: "memory",
 	})
 	assert.NoError(t, err)
@@ -57,7 +58,7 @@ func TestConcurrency_ReadWrite(t *testing.T) {
 // TestConcurrency_Tags verifies safe concurrent access for Tagging and Flushing.
 // This is critical to catch deadlocks between Put (locking) and FlushTags (locking).
 func TestConcurrency_Tags(t *testing.T) {
-	driver, err := NewDriver(cache.StoreConfig{
+	driver, err := NewDriver(dgcache.StoreConfig{
 		Driver: "memory",
 	})
 	assert.NoError(t, err)
@@ -102,7 +103,7 @@ func TestConcurrency_Tags(t *testing.T) {
 
 // TestConcurrency_Eviction verifies safe concurrent access under heavy load forcing eviction.
 func TestConcurrency_Eviction(t *testing.T) {
-	driver, err := NewDriver(cache.StoreConfig{
+	driver, err := NewDriver(dgcache.StoreConfig{
 		Options: map[string]interface{}{
 			"max_items": 100, // Small limit to force evictions
 		},

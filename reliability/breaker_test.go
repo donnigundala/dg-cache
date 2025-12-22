@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

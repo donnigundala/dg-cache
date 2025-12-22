@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 )
 
 // CircuitBreakerDriver wraps a cache driver with a circuit breaker.
@@ -18,6 +19,7 @@ func NewCircuitBreakerDriver(driver cache.Driver, breaker Breaker) *CircuitBreak
 	return &CircuitBreakerDriver{
 		Driver:  driver,
 		breaker: breaker,
+		// No change needed for Driver field as it's an interface
 	}
 }
 
@@ -59,7 +61,7 @@ func (d *CircuitBreakerDriver) Flush(ctx context.Context) error {
 
 // report updates the breaker state based on the error.
 func (d *CircuitBreakerDriver) report(err error) {
-	if err != nil && err != cache.ErrKeyNotFound {
+	if err != nil && err != dgcache.ErrKeyNotFound {
 		d.breaker.Failure()
 	} else {
 		d.breaker.Success()

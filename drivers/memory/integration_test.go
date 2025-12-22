@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 )
 
 func TestDriver_MaxItemsEviction(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"max_items":      3,
@@ -49,7 +49,7 @@ func TestDriver_MaxItemsEviction(t *testing.T) {
 
 	// key1 should be evicted
 	_, err = driver.Get(ctx, "key1")
-	if err != cache.ErrKeyNotFound {
+	if err != dgcache.ErrKeyNotFound {
 		t.Error("key1 should have been evicted")
 	}
 
@@ -60,7 +60,7 @@ func TestDriver_MaxItemsEviction(t *testing.T) {
 }
 
 func TestDriver_LRUEviction(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"max_items":       3,
@@ -90,7 +90,7 @@ func TestDriver_LRUEviction(t *testing.T) {
 
 	// key2 should be evicted
 	_, err = driver.Get(ctx, "key2")
-	if err != cache.ErrKeyNotFound {
+	if err != dgcache.ErrKeyNotFound {
 		t.Error("key2 should have been evicted (LRU)")
 	}
 
@@ -101,7 +101,7 @@ func TestDriver_LRUEviction(t *testing.T) {
 }
 
 func TestDriver_MaxBytesEviction(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"max_bytes":      100, // 100 byte limit
@@ -143,7 +143,7 @@ func TestDriver_MaxBytesEviction(t *testing.T) {
 }
 
 func TestDriver_Metrics(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"enable_metrics": true,
@@ -183,7 +183,7 @@ func TestDriver_Metrics(t *testing.T) {
 }
 
 func TestDriver_NoMetrics(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"enable_metrics": false,
@@ -206,7 +206,7 @@ func TestDriver_NoMetrics(t *testing.T) {
 }
 
 func TestDriver_ConfigurableCleanup(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"cleanup_interval": 100 * time.Millisecond,
@@ -234,13 +234,13 @@ func TestDriver_ConfigurableCleanup(t *testing.T) {
 
 	// Should be cleaned up
 	_, err = driver.Get(ctx, "key1")
-	if err != cache.ErrKeyNotFound {
+	if err != dgcache.ErrKeyNotFound {
 		t.Error("key1 should have been cleaned up")
 	}
 }
 
 func TestDriver_UpdateExisting(t *testing.T) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "memory",
 		Options: map[string]interface{}{
 			"enable_metrics": true,

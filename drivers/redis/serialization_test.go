@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 )
 
 // TestSerialization_SimpleTypes tests serialization of primitive types
@@ -316,7 +316,7 @@ func TestTaggedCache_PutMultiple(t *testing.T) {
 
 // Helper function to setup test driver
 func setupTestDriver(t *testing.T) (*Driver, func()) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",

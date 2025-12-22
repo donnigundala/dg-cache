@@ -1,0 +1,29 @@
+cache:
+  # Default store to use when no store name is specified.
+  default_store: memory
+
+  # Global prefix for all cache keys.
+  prefix: dg_cache
+
+  # Configure multiple cache stores.
+  stores:
+    # Memory store configuration.
+    memory:
+      driver: memory
+      # Store-specific prefix (overrides global prefix).
+      prefix: mem_
+
+    # Redis store configuration.
+    redis:
+      driver: redis
+      # Connection name to use (defined in database/redis config).
+      connection: default
+      prefix: redis_
+      # Driver-specific options.
+      options:
+        # Maximum number of idle connections.
+        max_idle: 10
+        # Maximum number of active connections.
+        max_active: 100
+        # Timeout for idle connections.
+        idle_timeout: 300s

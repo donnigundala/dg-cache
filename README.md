@@ -355,29 +355,31 @@ fmt.Printf("Hit rate: %.2f%%\n", stats.HitRate*100)
 fmt.Printf("Items: %d, Bytes: %d\n", stats.ItemCount, stats.BytesUsed)
 ```
 
-## Observability
+## 📊 Observability
+
+`dg-cache` is instrumented with OpenTelemetry metrics. As of v2.0.0, the legacy Prometheus collector has been replaced with native OpenTelemetry instruments.
 
 ### Standardized Metrics
-All drivers implement the `Observable` interface, exposing a `Stats()` method that returns:
-- `Hits` / `Misses`
-- `Sets` / `Deletes` / `Evictions`
-- `ItemCount` / `BytesUsed` (estimated)
+The following metrics are automatically collected from all active cache stores via asynchronous observers:
 
-### Prometheus Exporter
-Standard integration with Prometheus is provided via the `observability` package:
+*   `cache_hits_total`: Counter (labels: `cache_store`)
+*   `cache_misses_total`: Counter (labels: `cache_store`)
+*   `cache_sets_total`: Counter (labels: `cache_store`)
+*   `cache_deletes_total`: Counter (labels: `cache_store`)
+*   `cache_evictions_total`: Counter (labels: `cache_store`)
+*   `cache_items`: Gauge (labels: `cache_store`)
+*   `cache_bytes`: Gauge (labels: `cache_store`)
 
-```go
-import (
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/donnigundala/dg-cache/observability"
-)
+### Configuration
+To enable observability, ensure the `dg-observability` plugin is registered and configured:
 
-// ... setup cache ...
-
-// Create and register collector
-collector := observability.NewPrometheusCollector(manager.DefaultStore().(cache.Observable), "myapp", "cache")
-prometheus.MustRegister(collector)
+```yaml
+observability:
+  enabled: true
+  service_name: "my-app"
 ```
+
+The metrics are automatically registered on application boot. No manual collector registration is required.
 
 ## Reliability Features
 

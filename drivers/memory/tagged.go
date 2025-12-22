@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	cache "github.com/donnigundala/dg-core/contracts/cache"
 )
 
 // taggedCache implements the TaggedStore interface for the memory driver.

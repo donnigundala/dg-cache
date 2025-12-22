@@ -5,13 +5,13 @@ import (
 	"sync"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 )
 
 // Driver is an in-memory cache driver.
-// It stores cache items in memory with TTL support, size limits, and LRU eviction.
 type Driver struct {
-	items   map[string]*cache.Item
+	items   map[string]*dgcache.Item
 	lru     *lruList
 	nodes   map[string]*lruNode            // key -> LRU node mapping
 	tags    map[string]map[string]struct{} // tag -> set of keys
@@ -26,7 +26,7 @@ type Driver struct {
 }
 
 // NewDriver creates a new in-memory cache driver.
-func NewDriver(storeConfig cache.StoreConfig) (cache.Driver, error) {
+func NewDriver(storeConfig dgcache.StoreConfig) (cache.Driver, error) {
 	config := DefaultConfig()
 
 	// Parse options from storeConfig
@@ -52,7 +52,7 @@ func NewDriver(storeConfig cache.StoreConfig) (cache.Driver, error) {
 	}
 
 	d := &Driver{
-		items:   make(map[string]*cache.Item),
+		items:   make(map[string]*dgcache.Item),
 		lru:     newLRUList(),
 		nodes:   make(map[string]*lruNode),
 		tags:    make(map[string]map[string]struct{}),
@@ -201,7 +201,7 @@ func (d *Driver) Get(ctx context.Context, key string) (interface{}, error) {
 		if d.metrics != nil {
 			d.metrics.RecordMiss()
 		}
-		return nil, cache.ErrKeyNotFound
+		return nil, dgcache.ErrKeyNotFound
 	}
 
 	// Update LRU
@@ -256,7 +256,7 @@ func (d *Driver) put(key string, value interface{}, ttl time.Duration) error {
 		d.evictIfNeeded(netSizeChange)
 	}
 
-	item := &cache.Item{
+	item := &dgcache.Item{
 		Key:   key,
 		Value: value,
 	}
@@ -299,7 +299,7 @@ func (d *Driver) PutMultiple(ctx context.Context, items map[string]interface{}, 
 	}
 
 	for key, value := range items {
-		item := &cache.Item{
+		item := &dgcache.Item{
 			Key:       key,
 			Value:     value,
 			ExpiresAt: expiresAt,
@@ -326,7 +326,7 @@ func (d *Driver) Increment(ctx context.Context, key string, value int64) (int64,
 	}
 
 	newValue := current + value
-	d.items[prefixedKey] = &cache.Item{
+	d.items[prefixedKey] = &dgcache.Item{
 		Key:   key,
 		Value: newValue,
 	}
@@ -380,7 +380,7 @@ func (d *Driver) Flush(ctx context.Context) error {
 	defer d.mu.Unlock()
 
 	// Clear everything
-	d.items = make(map[string]*cache.Item)
+	d.items = make(map[string]*dgcache.Item)
 	d.nodes = make(map[string]*lruNode)
 	d.lru = newLRUList()
 	d.tags = make(map[string]map[string]struct{})

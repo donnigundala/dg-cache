@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 )
 
 // BenchmarkJSON_Put benchmarks Put operation with JSON serializer
 func BenchmarkJSON_Put(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -45,7 +45,7 @@ func BenchmarkJSON_Put(b *testing.B) {
 
 // BenchmarkMsgpack_Put benchmarks Put operation with msgpack serializer
 func BenchmarkMsgpack_Put(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -80,7 +80,7 @@ func BenchmarkMsgpack_Put(b *testing.B) {
 
 // BenchmarkJSON_Get benchmarks Get operation with JSON serializer
 func BenchmarkJSON_Get(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -116,7 +116,7 @@ func BenchmarkJSON_Get(b *testing.B) {
 
 // BenchmarkMsgpack_Get benchmarks Get operation with msgpack serializer
 func BenchmarkMsgpack_Get(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -152,7 +152,7 @@ func BenchmarkMsgpack_Get(b *testing.B) {
 
 // BenchmarkPutMultiple benchmarks batch Put operations
 func BenchmarkPutMultiple(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -192,7 +192,7 @@ func BenchmarkPutMultiple(b *testing.B) {
 
 // BenchmarkGetMultiple benchmarks batch Get operations
 func BenchmarkGetMultiple(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",
@@ -236,7 +236,7 @@ func BenchmarkGetMultiple(b *testing.B) {
 
 // BenchmarkTaggedCache_Put benchmarks tagged cache Put
 func BenchmarkTaggedCache_Put(b *testing.B) {
-	config := cache.StoreConfig{
+	config := dgcache.StoreConfig{
 		Driver: "redis",
 		Options: map[string]interface{}{
 			"host":       "localhost",

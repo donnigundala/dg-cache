@@ -3,7 +3,7 @@ package memory
 import (
 	"sync"
 
-	cache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 )
 
 // Metrics tracks cache statistics.

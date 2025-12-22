@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 	"github.com/donnigundala/dg-cache/compression"
 	"github.com/donnigundala/dg-cache/reliability"
 	"github.com/donnigundala/dg-cache/serializer"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -28,7 +29,7 @@ type Driver struct {
 }
 
 // NewDriver creates a new Redis cache driver.
-func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
+func NewDriver(config dgcache.StoreConfig) (cache.Driver, error) {
 	// Parse options into Redis config
 	redisConfig := DefaultConfig()
 	if err := config.Decode(&redisConfig); err != nil {
@@ -60,7 +61,7 @@ func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
 		}
 	}
 
-	var driver cache.Driver = &Driver{
+	var d cache.Driver = &Driver{
 		client:     client,
 		prefix:     config.Prefix,
 		serializer: ser,
@@ -82,11 +83,11 @@ func NewDriver(config cache.StoreConfig) (cache.Driver, error) {
 			}
 
 			breaker := reliability.NewThresholdBreaker(threshold, timeout)
-			driver = reliability.NewCircuitBreakerDriver(driver, breaker)
+			d = reliability.NewCircuitBreakerDriver(d, breaker)
 		}
 	}
 
-	return driver, nil
+	return d, nil
 }
 
 // NewDriverWithClient creates a new Redis cache driver with an existing client.
@@ -111,7 +112,7 @@ func (d *Driver) Get(ctx context.Context, key string) (interface{}, error) {
 	data, err := d.client.Get(ctx, d.prefixKey(key)).Bytes()
 	if err == redis.Nil {
 		d.recordMiss()
-		return nil, cache.ErrKeyNotFound
+		return nil, dgcache.ErrKeyNotFound
 	}
 	if err != nil {
 		return nil, err

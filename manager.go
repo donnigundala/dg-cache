@@ -1,22 +1,35 @@
-package cache
+package dgcache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/donnigundala/dg-core/contracts/cache"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // Manager manages multiple cache stores and provides a unified interface.
 type Manager struct {
 	config       Config
-	stores       map[string]Store
+	stores       map[string]cache.Store
 	drivers      map[string]DriverFactory
 	mu           sync.RWMutex
 	defaultStore string
+
+	// Observability
+	metricHits      metric.Int64ObservableCounter
+	metricMisses    metric.Int64ObservableCounter
+	metricSets      metric.Int64ObservableCounter
+	metricDeletes   metric.Int64ObservableCounter
+	metricEvictions metric.Int64ObservableCounter
+	metricItems     metric.Int64ObservableGauge
+	metricBytes     metric.Int64ObservableGauge
 }
 
 // DriverFactory is a function that creates a cache driver.
-type DriverFactory func(config StoreConfig) (Driver, error)
+type DriverFactory func(config StoreConfig) (cache.Driver, error)
 
 // NewManager creates a new cache manager with the given configuration.
 func NewManager(config Config) (*Manager, error) {
@@ -26,7 +39,7 @@ func NewManager(config Config) (*Manager, error) {
 
 	m := &Manager{
 		config:       config,
-		stores:       make(map[string]Store),
+		stores:       make(map[string]cache.Store),
 		drivers:      make(map[string]DriverFactory),
 		defaultStore: config.DefaultStore,
 	}
@@ -42,17 +55,17 @@ func (m *Manager) RegisterDriver(name string, factory DriverFactory) {
 }
 
 // Verify Manager implements Cache interface
-var _ Cache = (*Manager)(nil)
+var _ cache.Cache = (*Manager)(nil)
 
 // DefaultStore returns the default cache store.
-func (m *Manager) DefaultStore() Store {
+func (m *Manager) DefaultStore() cache.Store {
 	store, _ := m.Store("")
 	return store
 }
 
 // Store returns the cache store with the given name.
 // If name is empty, returns the default store.
-func (m *Manager) Store(name string) (Store, error) {
+func (m *Manager) Store(name string) (cache.Store, error) {
 	if name == "" {
 		name = m.defaultStore
 	}
@@ -70,7 +83,7 @@ func (m *Manager) Store(name string) (Store, error) {
 }
 
 // createStore creates and caches a new store instance.
-func (m *Manager) createStore(name string) (Store, error) {
+func (m *Manager) createStore(name string) (cache.Store, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -209,6 +222,27 @@ func (m *Manager) Has(ctx context.Context, key string) (bool, error) {
 	return store.Has(ctx, key)
 }
 
+// Stats returns the statistics of the default cache store.
+func (m *Manager) Stats() cache.Stats {
+	store, err := m.Store("")
+	if err != nil {
+		return cache.Stats{}
+	}
+	return store.Stats()
+}
+
+// Tags returns a tagged cache store.
+func (m *Manager) Tags(tags ...string) cache.TaggedStore {
+	store, err := m.Store("")
+	if err != nil {
+		panic(fmt.Sprintf("failed to get default store: %v", err))
+	}
+	if Taggable, ok := store.(cache.TaggedStore); ok {
+		return Taggable.Tags(tags...)
+	}
+	panic("default cache store does not support tagging")
+}
+
 // Missing checks if a key does not exist in the default cache store.
 func (m *Manager) Missing(ctx context.Context, key string) (bool, error) {
 	store, err := m.Store("")
@@ -278,6 +312,16 @@ func (m *Manager) Pull(ctx context.Context, key string) (interface{}, error) {
 	return value, nil
 }
 
+// GetPrefix returns the prefix of the default store.
+func (m *Manager) GetPrefix() string {
+	return m.DefaultStore().GetPrefix()
+}
+
+// SetPrefix sets the prefix of the default store.
+func (m *Manager) SetPrefix(prefix string) {
+	m.DefaultStore().SetPrefix(prefix)
+}
+
 // Stop stops the cache manager gracefully.
 // This implements the Stoppable interface.
 func (m *Manager) Stop(ctx context.Context) error {
@@ -291,7 +335,7 @@ func (m *Manager) Close() error {
 
 	var lastErr error
 	for name, store := range m.stores {
-		if driver, ok := store.(Driver); ok {
+		if driver, ok := store.(cache.Driver); ok {
 			if err := driver.Close(); err != nil {
 				lastErr = err
 			}

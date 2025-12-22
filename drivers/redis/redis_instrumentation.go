@@ -3,7 +3,7 @@ package redis
 import (
 	"sync/atomic"
 
-	cache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 )
 
 // Stats returns the current cache statistics.

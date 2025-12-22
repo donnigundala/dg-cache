@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	cache "github.com/donnigundala/dg-cache"
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -144,18 +144,13 @@ func (c *TaggedCache) Forever(ctx context.Context, key string, value interface{}
 	return c.Put(ctx, key, value, 0)
 }
 
-// FlushTags removes all items associated with the given tags.
-func (c *TaggedCache) FlushTags(ctx context.Context, tags ...string) error {
-	if len(tags) == 0 {
-		tags = c.tags
-	}
-
-	if len(tags) == 0 {
+// Flush removes all items associated with the current tags.
+func (c *TaggedCache) Flush(ctx context.Context) error {
+	if len(c.tags) == 0 {
 		return nil
 	}
 
 	// Load Lua script
-	// In a real implementation, we should embed this or load it once
 	script := redis.NewScript(`
 		local prefix = ARGV[1]
 		local keysToDelete = {}
@@ -188,5 +183,5 @@ func (c *TaggedCache) FlushTags(ctx context.Context, tags ...string) error {
 		return #keysToDelete
 	`)
 
-	return script.Run(ctx, c.client, tags, c.prefix).Err()
+	return script.Run(ctx, c.client, c.tags, c.prefix).Err()
 }

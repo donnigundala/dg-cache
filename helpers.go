@@ -1,4 +1,4 @@
-package cache
+package dgcache
 
 import (
 	"context"
@@ -6,18 +6,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/donnigundala/dg-core/contracts/foundation"
 )
 
 // GetAs retrieves a value and unmarshals it into the provided destination pointer.
 // This provides type-safe retrieval with automatic deserialization.
-//
-// Example:
-//
-//	var user User
-//	if err := cache.GetAs(ctx, "user:1", &user); err != nil {
-//	    // handle error
-//	}
 func (m *Manager) GetAs(ctx context.Context, key string, dest interface{}) error {
 	value, err := m.Get(ctx, key)
 	if err != nil {
@@ -62,7 +56,6 @@ func (m *Manager) GetAs(ctx context.Context, key string, dest interface{}) error
 }
 
 // GetString retrieves a string value from the cache.
-// Returns empty string and error if key doesn't exist or value is not a string.
 func (m *Manager) GetString(ctx context.Context, key string) (string, error) {
 	val, err := m.Get(ctx, key)
 	if err != nil {
@@ -73,29 +66,24 @@ func (m *Manager) GetString(ctx context.Context, key string) (string, error) {
 		return s, nil
 	}
 
-	// Try to convert to string
 	return fmt.Sprintf("%v", val), nil
 }
 
 // GetInt retrieves an int value from the cache.
-// Returns 0 and error if key doesn't exist or value cannot be converted to int.
 func (m *Manager) GetInt(ctx context.Context, key string) (int, error) {
 	val, err := m.Get(ctx, key)
 	if err != nil {
 		return 0, err
 	}
 
-	// Try direct type assertion
 	if i, ok := val.(int); ok {
 		return i, nil
 	}
 
-	// JSON unmarshals numbers as float64
 	if f, ok := val.(float64); ok {
 		return int(f), nil
 	}
 
-	// Try int64
 	if i64, ok := val.(int64); ok {
 		return int(i64), nil
 	}
@@ -161,42 +149,38 @@ func (m *Manager) GetBool(ctx context.Context, key string) (bool, error) {
 	return false, fmt.Errorf("value is not a bool: got %T", val)
 }
 
-// -----------------------------------------------------------------------------
-// Container Integration Helpers (v1.6.0)
-// -----------------------------------------------------------------------------
-
 // Resolve resolves the main cache manager from the application container.
-func Resolve(app foundation.Application) (Cache, error) {
-	instance, err := app.Make("cache")
+func Resolve(app foundation.Application) (cache.Cache, error) {
+	instance, err := app.Make(Binding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve cache: %w", err)
 	}
 
-	cache, ok := instance.(Cache)
+	c, ok := instance.(cache.Cache)
 	if !ok {
 		return nil, fmt.Errorf("resolved instance is not a Cache")
 	}
 
-	return cache, nil
+	return c, nil
 }
 
 // MustResolve resolves the cache manager or panics.
-func MustResolve(app foundation.Application) Cache {
-	cache, err := Resolve(app)
+func MustResolve(app foundation.Application) cache.Cache {
+	c, err := Resolve(app)
 	if err != nil {
 		panic(err)
 	}
-	return cache
+	return c
 }
 
 // ResolveStore resolves a named cache store from the container.
-func ResolveStore(app foundation.Application, name string) (Store, error) {
-	instance, err := app.Make(fmt.Sprintf("cache.%s", name))
+func ResolveStore(app foundation.Application, name string) (cache.Store, error) {
+	instance, err := app.Make(fmt.Sprintf("%s.%s", Binding, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve cache store %s: %w", name, err)
 	}
 
-	store, ok := instance.(Store)
+	store, ok := instance.(cache.Store)
 	if !ok {
 		return nil, fmt.Errorf("resolved instance is not a Store")
 	}
@@ -205,7 +189,7 @@ func ResolveStore(app foundation.Application, name string) (Store, error) {
 }
 
 // MustResolveStore resolves a named store or panics.
-func MustResolveStore(app foundation.Application, name string) Store {
+func MustResolveStore(app foundation.Application, name string) cache.Store {
 	store, err := ResolveStore(app, name)
 	if err != nil {
 		panic(err)
@@ -214,7 +198,6 @@ func MustResolveStore(app foundation.Application, name string) Store {
 }
 
 // Injectable provides a convenient way to inject cache dependencies.
-// Include this struct in your services to easily access cache stores.
 type Injectable struct {
 	app foundation.Application
 }
@@ -225,20 +208,17 @@ func NewInjectable(app foundation.Application) *Injectable {
 }
 
 // Cache returns the main cache manager.
-// Panics if cache cannot be resolved.
-func (i *Injectable) Cache() Cache {
+func (i *Injectable) Cache() cache.Cache {
 	return MustResolve(i.app)
 }
 
 // Store returns a named cache store.
-// Panics if the store cannot be resolved.
-func (i *Injectable) Store(name string) Store {
+func (i *Injectable) Store(name string) cache.Store {
 	return MustResolveStore(i.app, name)
 }
 
 // TryStore returns a named store or nil if it doesn't exist.
-// This is safe to use for optional cache stores.
-func (i *Injectable) TryStore(name string) Store {
+func (i *Injectable) TryStore(name string) cache.Store {
 	store, err := ResolveStore(i.app, name)
 	if err != nil {
 		return nil

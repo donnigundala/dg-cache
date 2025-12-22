@@ -1,8 +1,9 @@
-package cache
+package dgcache
 
 import (
 	"testing"
 
+	"github.com/donnigundala/dg-core/contracts/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +46,7 @@ func TestCacheServiceProvider_CustomConfig(t *testing.T) {
 }
 
 func TestCacheServiceProvider_DriverFactories(t *testing.T) {
-	mockFactory := func(config StoreConfig) (Driver, error) {
+	mockFactory := func(config StoreConfig) (cache.Driver, error) {
 		return nil, nil
 	}
 

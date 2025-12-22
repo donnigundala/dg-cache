@@ -1,4 +1,4 @@
-package cache_test
+package dgcache_test
 
 import (
 	"context"
@@ -6,14 +6,15 @@ import (
 	"time"
 
 	cache "github.com/donnigundala/dg-cache"
+	dgcache "github.com/donnigundala/dg-cache"
 	"github.com/donnigundala/dg-cache/drivers/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func createManager(t *testing.T) *cache.Manager {
-	cfg := cache.DefaultConfig()
-	manager, err := cache.NewManager(cfg)
+func createManager(t *testing.T) *dgcache.Manager {
+	cfg := dgcache.DefaultConfig()
+	manager, err := dgcache.NewManager(cfg)
 	require.NoError(t, err)
 
 	// Register memory driver
@@ -72,7 +73,7 @@ func TestManager_TTL(t *testing.T) {
 
 	// Should be gone
 	val, err = manager.Get(ctx, "short")
-	assert.Equal(t, cache.ErrKeyNotFound, err)
+	assert.Equal(t, dgcache.ErrKeyNotFound, err)
 	assert.Nil(t, val)
 }
 
