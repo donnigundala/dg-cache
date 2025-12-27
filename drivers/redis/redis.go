@@ -12,6 +12,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func init() {
+	dgcache.RegisterDriver("redis", NewDriver)
+}
+
 // Metrics tracks Redis cache statistics (client-side).
 type Metrics struct {
 	Hits    int64

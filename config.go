@@ -88,7 +88,7 @@ func (c Config) Validate() error {
 		return ErrInvalidConfig("default store is required")
 	}
 
-	if c.Stores == nil || len(c.Stores) == 0 {
+	if len(c.Stores) == 0 {
 		return ErrInvalidConfig("at least one store must be configured")
 	}
 

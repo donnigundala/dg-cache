@@ -32,6 +32,18 @@ type Manager struct {
 type DriverFactory func(config StoreConfig) (cache.Driver, error)
 
 // NewManager creates a new cache manager with the given configuration.
+var (
+	globalDrivers   = make(map[string]DriverFactory)
+	globalDriversMu sync.RWMutex
+)
+
+// RegisterDriver registers a driver factory globally.
+func RegisterDriver(name string, factory DriverFactory) {
+	globalDriversMu.Lock()
+	defer globalDriversMu.Unlock()
+	globalDrivers[name] = factory
+}
+
 func NewManager(config Config) (*Manager, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -42,6 +54,13 @@ func NewManager(config Config) (*Manager, error) {
 		stores:       make(map[string]cache.Store),
 		drivers:      make(map[string]DriverFactory),
 		defaultStore: config.DefaultStore,
+	}
+
+	// Load globally registered drivers
+	globalDriversMu.RLock()
+	defer globalDriversMu.RUnlock()
+	for name, factory := range globalDrivers {
+		m.drivers[name] = factory
 	}
 
 	return m, nil

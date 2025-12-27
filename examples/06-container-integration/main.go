@@ -7,7 +7,6 @@ import (
 	"time"
 
 	cache "github.com/donnigundala/dg-cache"
-	"github.com/donnigundala/dg-cache/drivers/memory"
 	"github.com/donnigundala/dg-core/foundation"
 )
 
@@ -41,20 +40,14 @@ func main() {
 	}
 
 	// 3. Register Provider
-	provider := &cache.CacheServiceProvider{
-		Config: config,
-		DriverFactories: map[string]cache.DriverFactory{
-			"memory": memory.NewDriver,
-		},
-	}
+	provider := cache.NewCacheServiceProvider(nil)
+	provider.Config = config // Manually set config for this example
 
-	if err := provider.Register(app); err != nil {
-		log.Fatalf("Failed to register cache provider: %v", err)
-	}
+	app.Register(provider)
 
-	// 4. Boot Application
-	if err := provider.Boot(app); err != nil {
-		log.Fatalf("Failed to boot cache provider: %v", err)
+	// 4. Boot Application (resolves dependencies)
+	if err := app.Boot(); err != nil {
+		log.Fatalf("Failed to boot application: %v", err)
 	}
 
 	fmt.Println("🚀 Cache Container Integration Example")

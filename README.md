@@ -5,7 +5,7 @@ Abstract caching layer for the dg-framework. Provides a unified API for various 
 ## Installation
 
 ```bash
-go get github.com/donnigundala/dg-cache@v1.3.0
+go get github.com/donnigundala/dg-cache@v1.0.0
 ```
 
 ## Features
@@ -88,29 +88,45 @@ Optional interface for drivers that support cache tagging to group related cache
 
 ## Quick Start
 
-### Basic Usage
-
 ```go
+package main
+
 import (
     "context"
+    "log"
     "time"
+    "github.com/donnigundala/dg-core/foundation"
     "github.com/donnigundala/dg-cache"
-    "github.com/donnigundala/dg-cache/drivers/memory"
 )
 
 func main() {
-    // Create manager
-    manager, _ := cache.NewManager(cache.DefaultConfig())
+    app := foundation.New(".")
     
-    // Register memory driver
-    manager.RegisterDriver("memory", memory.NewDriver)
+    // Register provider (uses 'cache' key in config)
+    app.Register(dgcache.NewCacheServiceProvider(nil))
     
+    if err := app.Boot(); err != nil {
+        log.Fatal(err)
+    }
+    
+    // Usage
+    cacheMgr := dgcache.MustResolve(app)
     ctx := context.Background()
     
-    // Store and retrieve strings
-    manager.Put(ctx, "name", "John", 10*time.Minute)
-    val, _ := manager.Get(ctx, "name")
-    name := val.(string) // "John"
+    cacheMgr.Put(ctx, "key", "value", 10*time.Minute)
+    val, _ := cacheMgr.Get(ctx, "key")
+}
+```
+
+### Integration via InfrastructureSuite
+In your `bootstrap/app.go`, you typically use the declarative suite pattern:
+
+```go
+func InfrastructureSuite(workerMode bool) []foundation.ServiceProvider {
+	return []foundation.ServiceProvider{
+		dgcache.NewCacheServiceProvider(nil),
+		// ... other providers
+	}
 }
 ```
 
@@ -282,32 +298,32 @@ func (s *UserService) CacheUser(ctx context.Context, user *User) {
 }
 ```
 
-## Serialization
+## Configuration
 
-### Supported Types
+The plugin uses the `cache` key in your configuration file.
 
-- Primitives: `string`, `int`, `float64`, `bool`
-- Complex types: `struct`, `slice`, `map`
-- Nested structures
-- Custom types
+### Configuration Mapping (YAML vs ENV)
 
-### Choosing a Serializer
+| YAML Key | Environment Variable | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `cache.default_store` | `CACHE_DRIVER` | `memory` | Default store name |
+| `cache.prefix` | `CACHE_PREFIX` | `dg_cache` | Global key prefix |
+| `cache.stores.<name>.driver` | - | - | `redis`, `memory` |
+| `cache.stores.<name>.prefix` | - | - | Store-specific prefix |
+| `cache.stores.<name>.connection` | - | `default` | Redis connection name |
 
-**JSON** (default):
-- Human-readable
-- ~150ns marshal, ~440ns unmarshal
-- Good for debugging
+### Example YAML
 
-**Msgpack**:
-- Binary format (30-50% smaller)
-- ~210ns marshal, ~172ns unmarshal (2.6x faster!)
-- Better for production
-
-```go
-```go
-Options: map[string]interface{}{
-    "serializer": "msgpack",  // or "json"
-}
+```yaml
+cache:
+  default_store: redis
+  prefix: app_
+  stores:
+    memory:
+      driver: memory
+    redis:
+      driver: redis
+      connection: default
 ```
 
 ### Compression

@@ -51,7 +51,7 @@ func (p *CacheServiceProvider) Register(app foundation.Application) error {
 			return nil, fmt.Errorf("failed to create cache manager: %w", err)
 		}
 
-		// Register driver factories if provided
+		// Register driver factories if provided explicitly
 		if p.DriverFactories != nil {
 			for name, factory := range p.DriverFactories {
 				manager.RegisterDriver(name, factory)
@@ -87,18 +87,6 @@ func (p *CacheServiceProvider) Boot(app foundation.Application) error {
 			}
 			return store, nil
 		})
-	}
-
-	// Register metrics
-	if err := manager.RegisterMetrics(); err != nil {
-		// Log error but don't fail boot
-		if log, err := app.Make("logger"); err == nil {
-			if l, ok := log.(interface {
-				Warn(msg string, args ...interface{})
-			}); ok {
-				l.Warn("Failed to register cache metrics", "error", err)
-			}
-		}
 	}
 
 	return nil

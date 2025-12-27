@@ -9,6 +9,10 @@ import (
 	"github.com/donnigundala/dg-core/contracts/cache"
 )
 
+func init() {
+	dgcache.RegisterDriver("memory", NewDriver)
+}
+
 // Driver is an in-memory cache driver.
 type Driver struct {
 	items   map[string]*dgcache.Item

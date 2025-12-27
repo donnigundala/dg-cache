@@ -14,7 +14,7 @@ func TestCacheServiceProvider_Name(t *testing.T) {
 
 func TestCacheServiceProvider_Version(t *testing.T) {
 	provider := &CacheServiceProvider{}
-	assert.Equal(t, "1.6.2", provider.Version())
+	assert.Equal(t, "1.7.0", provider.Version())
 }
 
 func TestCacheServiceProvider_Dependencies(t *testing.T) {
